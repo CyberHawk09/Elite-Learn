@@ -1,3 +1,4 @@
+package com.elitelearn;
 // AIService.java
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
