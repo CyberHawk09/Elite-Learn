@@ -2,37 +2,27 @@
 public class Flashcard {
     private String question;
     private String answer;
-    private float weight;
+    private double weight; // Changed to double to match getter/setter and Gson expectations
 
-    public Flashcard(String question, String answer, float weight) {
+    // No-arg constructor required for Gson deserialization
+    public Flashcard() {
+        this.weight = 1.0; 
+    }
+
+    public Flashcard(String question, String answer, double weight) {
         this.question = question;
         this.answer = answer;
         this.weight = weight;
     }
 
-    public String getQuestion() {
-        return question;
-    }
-
-    public void setQuestion(String question) {
-        this.question = question;
-    }
-
-    public String getAnswer() {
-        return answer;
-    }
-
-    public void setAnswer(String answer) {
-        this.answer = answer;
-    }
-
-    public float getWeight() {
-        return weight;
-    }
-
-    public void setWeight(float weight) {
-        this.weight = weight;
-    }
+    public String getQuestion() { return question; }
+    public void setQuestion(String question) { this.question = question; }
+    
+    public String getAnswer() { return answer; }
+    public void setAnswer(String answer) { this.answer = answer; }
+    
+    public double getWeight() { return weight; }
+    public void setWeight(double weight) { this.weight = weight; }
 
     @Override
     public String toString() {
