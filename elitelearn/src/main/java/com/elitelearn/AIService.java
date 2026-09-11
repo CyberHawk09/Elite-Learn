@@ -14,7 +14,7 @@ import java.util.List;
 
 public class AIService {
     private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
-    private static final String MODEL = "gemini-1.5-flash"; 
+    private static final String MODEL = "gemini-3.6-flash";
     private final HttpClient httpClient;
     private final Gson gson;
 
