@@ -3,12 +3,14 @@ package com.elitelearn;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.StringSelection;
 import java.awt.datatransfer.Transferable;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.File;
 import java.util.List;
 
 public class EliteLearnGUI extends JFrame {
@@ -32,6 +34,9 @@ public class EliteLearnGUI extends JFrame {
     private final AIService aiService = new AIService();
     private Deck currentStudyDeck;
     private Flashcard currentStudyCard;
+    
+    // New State for PDF & Quantity
+    private File selectedPdf = null;
 
     // --- UI Components ---
     private JPanel contentPanel;
@@ -42,6 +47,10 @@ public class EliteLearnGUI extends JFrame {
     private JLabel studyQuestionLabel;
     private JLabel studyAnswerLabel;
     private JButton revealBtn;
+    
+    // New UI Components
+    private JSpinner numCardsSpinner;
+    private JLabel pdfStatusLabel;
 
     public EliteLearnGUI() {
         setTitle("EliteLearn");
@@ -155,7 +164,6 @@ public class EliteLearnGUI extends JFrame {
         JPanel mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBackground(BG_MAIN);
 
-        // --- Top Bar with Back Button ---
         JPanel topBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
         topBar.setBackground(BG_MAIN);
         JButton backBtn = createStyledButton("< Back to Main Menu", TEXT_SECONDARY, false);
@@ -163,7 +171,6 @@ public class EliteLearnGUI extends JFrame {
         topBar.add(backBtn);
         mainPanel.add(topBar, BorderLayout.NORTH);
 
-        // --- Scrollable Deck List ---
         deckListModel = new DefaultListModel<>();
         JList<Deck> deckList = new JList<>(deckListModel);
         deckList.setCellRenderer(new DeckCellRenderer());
@@ -171,12 +178,10 @@ public class EliteLearnGUI extends JFrame {
         deckList.setBackground(BG_MAIN);
         deckList.setSelectionBackground(new Color(53, 116, 240, 50));
 
-        // Enable Drag and Drop (rewritten to use simple string-based transfer)
         deckList.setDragEnabled(true);
         deckList.setDropMode(DropMode.INSERT);
         deckList.setTransferHandler(new DeckTransferHandler());
 
-        // Click handling: right side = delete, left side = open deck
         deckList.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseReleased(MouseEvent e) {
@@ -200,7 +205,6 @@ public class EliteLearnGUI extends JFrame {
         scrollPane.getViewport().setBackground(BG_MAIN);
         mainPanel.add(scrollPane, BorderLayout.CENTER);
 
-        // --- Fixed Bottom Bar ---
         JPanel bottomBar = new JPanel(new FlowLayout(FlowLayout.CENTER));
         bottomBar.setBackground(BG_CARD);
         bottomBar.setBorder(new LineBorder(BORDER_COLOR, 1));
@@ -215,6 +219,9 @@ public class EliteLearnGUI extends JFrame {
         addBtn.setFocusPainted(false);
         addBtn.addActionListener(e -> {
             notesArea.setText("");
+            selectedPdf = null;
+            pdfStatusLabel.setText("No PDF selected (Using text area)");
+            notesArea.setEnabled(true);
             cardLayout.show(contentPanel, "NEW_DECK");
         });
 
@@ -225,18 +232,66 @@ public class EliteLearnGUI extends JFrame {
     }
 
     // ==========================================
-    // 4. NEW DECK SCREEN
+    // 4. NEW DECK SCREEN (Added Spinner & PDF Upload)
     // ==========================================
     private JPanel buildNewDeckScreen() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBackground(BG_MAIN);
         panel.setBorder(new EmptyBorder(20, 20, 20, 20));
 
-        JLabel title = new JLabel("Create New Deck from Notes");
+        // --- Top Options Panel ---
+        JPanel topOptions = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
+        topOptions.setBackground(BG_MAIN);
+        
+        JLabel numLabel = new JLabel("Cards (1-100):");
+        numLabel.setForeground(TEXT_PRIMARY);
+        topOptions.add(numLabel);
+
+        numCardsSpinner = new JSpinner(new SpinnerNumberModel(20, 1, 100, 1));
+        JComponent editor = numCardsSpinner.getEditor();
+        ((JSpinner.DefaultEditor) editor).getTextField().setBackground(BG_INPUT);
+        ((JSpinner.DefaultEditor) editor).getTextField().setForeground(TEXT_PRIMARY);
+        ((JSpinner.DefaultEditor) editor).getTextField().setCaretColor(TEXT_PRIMARY);
+        topOptions.add(numCardsSpinner);
+
+        JButton uploadPdfBtn = createStyledButton("Upload PDF", ACCENT_BLUE, false);
+        uploadPdfBtn.addActionListener(e -> {
+            JFileChooser fc = new JFileChooser();
+            fc.setFileFilter(new FileNameExtensionFilter("PDF Documents", "pdf"));
+            if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+                selectedPdf = fc.getSelectedFile();
+                pdfStatusLabel.setText("Selected: " + selectedPdf.getName());
+                pdfStatusLabel.setForeground(ACCENT_BLUE);
+                notesArea.setEnabled(false);
+                notesArea.setText("");
+            }
+        });
+        topOptions.add(uploadPdfBtn);
+
+        JButton clearPdfBtn = createStyledButton("Clear PDF", TEXT_SECONDARY, false);
+        clearPdfBtn.addActionListener(e -> {
+            selectedPdf = null;
+            pdfStatusLabel.setText("No PDF selected (Using text area)");
+            pdfStatusLabel.setForeground(TEXT_SECONDARY);
+            notesArea.setEnabled(true);
+        });
+        topOptions.add(clearPdfBtn);
+
+        pdfStatusLabel = new JLabel("No PDF selected (Using text area)");
+        pdfStatusLabel.setForeground(TEXT_SECONDARY);
+        topOptions.add(pdfStatusLabel);
+
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setOpaque(false);
+        JLabel title = new JLabel("Create New Deck");
         title.setFont(new Font("Segoe UI", Font.BOLD, 18));
         title.setForeground(Color.WHITE);
-        panel.add(title, BorderLayout.NORTH);
+        headerPanel.add(title, BorderLayout.NORTH);
+        headerPanel.add(topOptions, BorderLayout.SOUTH);
+        
+        panel.add(headerPanel, BorderLayout.NORTH);
 
+        // --- Center Text Area ---
         notesArea = new JTextArea();
         notesArea.setFont(FONT_MAIN);
         notesArea.setBackground(BG_INPUT);
@@ -251,6 +306,7 @@ public class EliteLearnGUI extends JFrame {
         scrollPane.setBorder(null);
         panel.add(scrollPane, BorderLayout.CENTER);
 
+        // --- Bottom Buttons ---
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         btnPanel.setBackground(BG_MAIN);
 
@@ -268,7 +324,7 @@ public class EliteLearnGUI extends JFrame {
     }
 
     // ==========================================
-    // 5. STUDY SCREEN (Toggle Reveal)
+    // 5. STUDY SCREEN
     // ==========================================
     private JPanel buildStudyScreen() {
         JPanel panel = new JPanel(new BorderLayout(20, 20));
@@ -298,7 +354,6 @@ public class EliteLearnGUI extends JFrame {
         JPanel bottomBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
         bottomBar.setOpaque(false);
 
-        // FIX: Toggle between Reveal and Hide
         revealBtn = createStyledButton("Reveal Answer", ACCENT_BLUE, false);
         revealBtn.addActionListener(e -> {
             boolean isCurrentlyVisible = studyAnswerLabel.isVisible();
@@ -341,16 +396,27 @@ public class EliteLearnGUI extends JFrame {
     }
 
     private void generateDeck() {
-        String notes = notesArea.getText();
-        if (notes.trim().isEmpty() || apiKey.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Please enter notes and set your API key first.");
+        int numCards = (int) numCardsSpinner.getValue();
+        
+        // Validate inputs
+        if (selectedPdf == null && notesArea.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please enter notes or upload a PDF first.");
+            return;
+        }
+        if (apiKey.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please set your API key first.");
             return;
         }
 
+        // Run AI in background thread
         SwingWorker<List<Flashcard>, Void> worker = new SwingWorker<>() {
             @Override
             protected List<Flashcard> doInBackground() throws Exception {
-                return aiService.generateFlashcards(notes, apiKey);
+                if (selectedPdf != null) {
+                    return aiService.generateFlashcardsFromPdf(selectedPdf, numCards, apiKey);
+                } else {
+                    return aiService.generateFlashcards(notesArea.getText(), numCards, apiKey);
+                }
             }
 
             @Override
@@ -392,7 +458,8 @@ public class EliteLearnGUI extends JFrame {
         studyQuestionLabel.setText("<html><center>" + currentStudyCard.getQuestion() + "</center></html>");
         studyAnswerLabel.setText("<html><center>" + currentStudyCard.getAnswer() + "</center></html>");
         studyAnswerLabel.setVisible(false);
-        revealBtn.setText("Reveal Answer"); // Reset toggle state for new card
+        revealBtn.setText("Reveal Answer"); 
+        revealBtn.setEnabled(true);
     }
 
     private void handleStudyResult(boolean isCorrect) {
@@ -417,14 +484,12 @@ public class EliteLearnGUI extends JFrame {
             btn.setForeground(themeColor);
         }
         btn.setBorder(new LineBorder(themeColor, 1, true));
-
-        // FIX: Wider margins so text never overlaps the rounded border
-        btn.setMargin(new Insets(12, 35, 12, 35));
+        btn.setMargin(new Insets(12, 35, 12, 35)); 
 
         return btn;
     }
 
-    // --- Drag and Drop (Rewritten with simple string-based transfer) ---
+    // --- Drag and Drop & List Rendering ---
 
     private class DeckCellRenderer extends JPanel implements ListCellRenderer<Deck> {
         private JLabel titleLabel = new JLabel();
@@ -460,16 +525,13 @@ public class EliteLearnGUI extends JFrame {
     @SuppressWarnings("unchecked")
     private class DeckTransferHandler extends TransferHandler {
         @Override
-        public int getSourceActions(JComponent c) {
-            return MOVE;
-        }
+        public int getSourceActions(JComponent c) { return MOVE; }
 
         @Override
         protected Transferable createTransferable(JComponent c) {
             JList<Deck> list = (JList<Deck>) c;
             int index = list.getSelectedIndex();
             if (index < 0) return null;
-            // Transfer the index as a simple string - much more reliable than custom DataFlavors
             return new StringSelection(String.valueOf(index));
         }
 
@@ -481,7 +543,6 @@ public class EliteLearnGUI extends JFrame {
         @Override
         public boolean importData(TransferSupport support) {
             if (!canImport(support)) return false;
-
             JList.DropLocation dl = (JList.DropLocation) support.getDropLocation();
             int dropIndex = dl.getIndex();
 
@@ -489,17 +550,12 @@ public class EliteLearnGUI extends JFrame {
                 String data = (String) support.getTransferable().getTransferData(DataFlavor.stringFlavor);
                 int dragIndex = Integer.parseInt(data);
 
-                // Validate indices
                 if (dragIndex < 0 || dragIndex >= decks.size()) return false;
                 if (dropIndex < 0) dropIndex = decks.size();
                 if (dropIndex > decks.size()) dropIndex = decks.size();
-
-                // Don't do anything if dropping in the same spot
                 if (dragIndex == dropIndex || dragIndex == dropIndex - 1) return false;
 
-                // Perform the reorder on the backing list
                 Deck draggedDeck = decks.remove(dragIndex);
-                // Adjust drop index after removal
                 if (dropIndex > dragIndex) dropIndex--;
                 decks.add(dropIndex, draggedDeck);
 
@@ -516,7 +572,7 @@ public class EliteLearnGUI extends JFrame {
         SwingUtilities.invokeLater(() -> {
             try {
                 UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-            } catch (Exception e) {
+            } catch (Exception e) { 
                 e.printStackTrace();
             }
             new EliteLearnGUI().setVisible(true);

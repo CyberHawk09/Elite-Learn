@@ -3,17 +3,16 @@ package com.elitelearn;
 public class Flashcard {
     private String question;
     private String answer;
-    private double weight; // Changed to double to match getter/setter and Gson expectations
+    private double weight = 1.0; // Changed to double to match getter/setter and Gson expectations
 
     // No-arg constructor required for Gson deserialization
     public Flashcard() {
         this.weight = 1.0; 
     }
 
-    public Flashcard(String question, String answer, double weight) {
+    public Flashcard(String question, String answer) {
         this.question = question;
         this.answer = answer;
-        this.weight = weight;
     }
 
     public String getQuestion() { return question; }
