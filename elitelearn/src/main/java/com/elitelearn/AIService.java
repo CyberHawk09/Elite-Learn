@@ -48,16 +48,17 @@ public class AIService {
     }
 
     // --- Private Helper Methods ---
-
-        private String buildPrompt(int numCards, String sourceDescription, String rawNotes) {
+    private String buildPrompt(int numCards, String sourceDescription, String rawNotes) {
         return """
                 You are an expert educational assistant. Convert %s into exactly %d flashcard-style questions and answers.
                 Create comprehensive questions that test understanding, not just memorization.
                 
-                You MUST output ONLY a valid JSON array of objects. 
-                Each object must have exactly these two keys:
-                - "question": string
-                - "answer": string
+                IMPORTANT FORMATTING RULES:
+                - You MUST output ONLY a valid JSON array of objects.
+                - Each object must have exactly these two keys: "question" and "answer".
+                - Use PLAIN TEXT for all mathematical expressions. 
+                - Do NOT use LaTeX, Markdown math formatting, or dollar signs. 
+                  (For example: write "f(x) = 2x + 1", NOT "$f(x) = 2x + 1$").
                 
                 Source material:
                 %s

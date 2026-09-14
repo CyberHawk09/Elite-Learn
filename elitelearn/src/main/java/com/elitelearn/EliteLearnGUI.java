@@ -232,27 +232,40 @@ public class EliteLearnGUI extends JFrame {
     }
 
     // ==========================================
-    // 4. NEW DECK SCREEN (Added Spinner & PDF Upload)
+    // 4. NEW DECK SCREEN (Fixed Layout & Painting)
     // ==========================================
     private JPanel buildNewDeckScreen() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBackground(BG_MAIN);
         panel.setBorder(new EmptyBorder(20, 20, 20, 20));
 
-        // --- Top Options Panel ---
-        JPanel topOptions = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
-        topOptions.setBackground(BG_MAIN);
-        
+        // --- Top Header & Options ---
+        JPanel headerPanel = new JPanel(new BorderLayout(0, 10));
+        headerPanel.setBackground(BG_MAIN); // FIX: Removed setOpaque(false)
+
+        JLabel title = new JLabel("Create New Deck");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        title.setForeground(Color.WHITE);
+        headerPanel.add(title, BorderLayout.NORTH);
+
+        // Use BorderLayout for the options row to prevent clipping
+        JPanel topOptions = new JPanel(new BorderLayout(15, 0));
+        topOptions.setBackground(BG_MAIN); // FIX: Removed setOpaque(false)
+
+        // Left side: Spinner and Buttons
+        JPanel leftControls = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
+        leftControls.setBackground(BG_MAIN); // FIX: Removed setOpaque(false)
+
         JLabel numLabel = new JLabel("Cards (1-100):");
         numLabel.setForeground(TEXT_PRIMARY);
-        topOptions.add(numLabel);
+        leftControls.add(numLabel);
 
         numCardsSpinner = new JSpinner(new SpinnerNumberModel(20, 1, 100, 1));
         JComponent editor = numCardsSpinner.getEditor();
         ((JSpinner.DefaultEditor) editor).getTextField().setBackground(BG_INPUT);
         ((JSpinner.DefaultEditor) editor).getTextField().setForeground(TEXT_PRIMARY);
         ((JSpinner.DefaultEditor) editor).getTextField().setCaretColor(TEXT_PRIMARY);
-        topOptions.add(numCardsSpinner);
+        leftControls.add(numCardsSpinner);
 
         JButton uploadPdfBtn = createStyledButton("Upload PDF", ACCENT_BLUE, false);
         uploadPdfBtn.addActionListener(e -> {
@@ -260,35 +273,49 @@ public class EliteLearnGUI extends JFrame {
             fc.setFileFilter(new FileNameExtensionFilter("PDF Documents", "pdf"));
             if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
                 selectedPdf = fc.getSelectedFile();
-                pdfStatusLabel.setText("Selected: " + selectedPdf.getName());
-                pdfStatusLabel.setForeground(ACCENT_BLUE);
-                notesArea.setEnabled(false);
-                notesArea.setText("");
+                
+                SwingUtilities.invokeLater(() -> {
+                    pdfStatusLabel.setText("Selected: " + selectedPdf.getName());
+                    pdfStatusLabel.setForeground(ACCENT_BLUE);
+                    pdfStatusLabel.revalidate();
+                    pdfStatusLabel.repaint();
+                    topOptions.revalidate();
+                    topOptions.repaint();
+                    
+                    notesArea.setEnabled(false);
+                    notesArea.setText("");
+                });
             }
         });
-        topOptions.add(uploadPdfBtn);
+        leftControls.add(uploadPdfBtn);
 
         JButton clearPdfBtn = createStyledButton("Clear PDF", TEXT_SECONDARY, false);
         clearPdfBtn.addActionListener(e -> {
             selectedPdf = null;
-            pdfStatusLabel.setText("No PDF selected (Using text area)");
-            pdfStatusLabel.setForeground(TEXT_SECONDARY);
-            notesArea.setEnabled(true);
+            
+            SwingUtilities.invokeLater(() -> {
+                pdfStatusLabel.setText("No PDF selected (Using text area)");
+                pdfStatusLabel.setForeground(TEXT_SECONDARY);
+                pdfStatusLabel.revalidate();
+                pdfStatusLabel.repaint();
+                topOptions.revalidate();
+                topOptions.repaint();
+                
+                notesArea.setEnabled(true);
+            });
         });
-        topOptions.add(clearPdfBtn);
+        leftControls.add(clearPdfBtn);
 
+        // Add the grouped controls to the WEST (left) side
+        topOptions.add(leftControls, BorderLayout.WEST);
+
+        // Right side: Status Label (takes remaining space, won't clip)
         pdfStatusLabel = new JLabel("No PDF selected (Using text area)");
         pdfStatusLabel.setForeground(TEXT_SECONDARY);
-        topOptions.add(pdfStatusLabel);
+        topOptions.add(pdfStatusLabel, BorderLayout.CENTER);
 
-        JPanel headerPanel = new JPanel(new BorderLayout());
-        headerPanel.setOpaque(false);
-        JLabel title = new JLabel("Create New Deck");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        title.setForeground(Color.WHITE);
-        headerPanel.add(title, BorderLayout.NORTH);
         headerPanel.add(topOptions, BorderLayout.SOUTH);
-        
+
         panel.add(headerPanel, BorderLayout.NORTH);
 
         // --- Center Text Area ---
