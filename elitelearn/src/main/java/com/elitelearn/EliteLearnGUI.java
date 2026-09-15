@@ -1,5 +1,6 @@
 package com.elitelearn;
 
+import com.google.gson.Gson;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
@@ -11,6 +12,7 @@ import java.awt.datatransfer.Transferable;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
+import java.nio.file.Files;
 import java.util.List;
 
 public class EliteLearnGUI extends JFrame {
@@ -32,10 +34,9 @@ public class EliteLearnGUI extends JFrame {
     private final List<Deck> decks = new java.util.ArrayList<>();
     private String apiKey = "";
     private final AIService aiService = new AIService();
+    private final Gson gson = new Gson(); // Added for Export/Import
     private Deck currentStudyDeck;
     private Flashcard currentStudyCard;
-    
-    // New State for PDF & Quantity
     private File selectedPdf = null;
 
     // --- UI Components ---
@@ -47,8 +48,6 @@ public class EliteLearnGUI extends JFrame {
     private JLabel studyQuestionLabel;
     private JLabel studyAnswerLabel;
     private JButton revealBtn;
-    
-    // New UI Components
     private JSpinner numCardsSpinner;
     private JLabel pdfStatusLabel;
 
@@ -158,7 +157,7 @@ public class EliteLearnGUI extends JFrame {
     }
 
     // ==========================================
-    // 3. DECKS SCREEN
+    // 3. DECKS SCREEN (Added Export Button)
     // ==========================================
     private JPanel buildDecksScreen() {
         JPanel mainPanel = new JPanel(new BorderLayout());
@@ -182,6 +181,7 @@ public class EliteLearnGUI extends JFrame {
         deckList.setDropMode(DropMode.INSERT);
         deckList.setTransferHandler(new DeckTransferHandler());
 
+        // Mouse Listener for Delete, Export, and Opening Deck
         deckList.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseReleased(MouseEvent e) {
@@ -189,10 +189,21 @@ public class EliteLearnGUI extends JFrame {
                 if (index != -1) {
                     Rectangle cellBounds = deckList.getCellBounds(index, index);
                     if (cellBounds != null && cellBounds.contains(e.getPoint())) {
-                        if (e.getX() > cellBounds.x + cellBounds.width - 90) {
-                            decks.remove(index);
-                            refreshDeckList();
+                        int rightEdge = cellBounds.x + cellBounds.width;
+                        
+                        // The right panel containing buttons is roughly 190px wide (Export 80 + gap 10 + Delete 80 + padding 20)
+                        if (e.getX() > rightEdge - 190) {
+                            // We clicked in the button area. Which one?
+                            // Delete is the rightmost 90px
+                            if (e.getX() > rightEdge - 90) {
+                                decks.remove(index);
+                                refreshDeckList();
+                            } else {
+                                // Otherwise, it's the Export button
+                                exportDeck(deckListModel.get(index));
+                            }
                         } else {
+                            // Clicked on the text -> Open Study Session
                             startStudySession(deckListModel.get(index));
                         }
                     }
@@ -221,6 +232,7 @@ public class EliteLearnGUI extends JFrame {
             notesArea.setText("");
             selectedPdf = null;
             pdfStatusLabel.setText("No PDF selected (Using text area)");
+            pdfStatusLabel.setForeground(TEXT_SECONDARY);
             notesArea.setEnabled(true);
             cardLayout.show(contentPanel, "NEW_DECK");
         });
@@ -232,29 +244,39 @@ public class EliteLearnGUI extends JFrame {
     }
 
     // ==========================================
-    // 4. NEW DECK SCREEN (Fixed Layout & Painting)
+    // 4. NEW DECK SCREEN (Added Import Button)
     // ==========================================
     private JPanel buildNewDeckScreen() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBackground(BG_MAIN);
         panel.setBorder(new EmptyBorder(20, 20, 20, 20));
 
-        // --- Top Header & Options ---
         JPanel headerPanel = new JPanel(new BorderLayout(0, 10));
-        headerPanel.setBackground(BG_MAIN); // FIX: Removed setOpaque(false)
+        headerPanel.setBackground(BG_MAIN);
 
         JLabel title = new JLabel("Create New Deck");
         title.setFont(new Font("Segoe UI", Font.BOLD, 18));
         title.setForeground(Color.WHITE);
         headerPanel.add(title, BorderLayout.NORTH);
 
-        // Use BorderLayout for the options row to prevent clipping
-        JPanel topOptions = new JPanel(new BorderLayout(15, 0));
-        topOptions.setBackground(BG_MAIN); // FIX: Removed setOpaque(false)
+        // Container for the options to allow stacking Import above the rest
+        JPanel optionsContainer = new JPanel(new BorderLayout(0, 10));
+        optionsContainer.setBackground(BG_MAIN);
 
-        // Left side: Spinner and Buttons
+        // --- IMPORT ROW (Placed at the top) ---
+        JPanel importRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
+        importRow.setBackground(BG_MAIN);
+        JButton importBtn = createStyledButton("Import Deck from File", ACCENT_BLUE, false);
+        importBtn.addActionListener(e -> importDeck());
+        importRow.add(importBtn);
+        optionsContainer.add(importRow, BorderLayout.NORTH);
+
+        // --- OPTIONS ROW (Placed below Import) ---
+        JPanel topOptions = new JPanel(new BorderLayout(15, 0));
+        topOptions.setBackground(BG_MAIN);
+
         JPanel leftControls = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
-        leftControls.setBackground(BG_MAIN); // FIX: Removed setOpaque(false)
+        leftControls.setBackground(BG_MAIN);
 
         JLabel numLabel = new JLabel("Cards (1-100):");
         numLabel.setForeground(TEXT_PRIMARY);
@@ -273,7 +295,6 @@ public class EliteLearnGUI extends JFrame {
             fc.setFileFilter(new FileNameExtensionFilter("PDF Documents", "pdf"));
             if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
                 selectedPdf = fc.getSelectedFile();
-                
                 SwingUtilities.invokeLater(() -> {
                     pdfStatusLabel.setText("Selected: " + selectedPdf.getName());
                     pdfStatusLabel.setForeground(ACCENT_BLUE);
@@ -281,7 +302,6 @@ public class EliteLearnGUI extends JFrame {
                     pdfStatusLabel.repaint();
                     topOptions.revalidate();
                     topOptions.repaint();
-                    
                     notesArea.setEnabled(false);
                     notesArea.setText("");
                 });
@@ -292,7 +312,6 @@ public class EliteLearnGUI extends JFrame {
         JButton clearPdfBtn = createStyledButton("Clear PDF", TEXT_SECONDARY, false);
         clearPdfBtn.addActionListener(e -> {
             selectedPdf = null;
-            
             SwingUtilities.invokeLater(() -> {
                 pdfStatusLabel.setText("No PDF selected (Using text area)");
                 pdfStatusLabel.setForeground(TEXT_SECONDARY);
@@ -300,21 +319,19 @@ public class EliteLearnGUI extends JFrame {
                 pdfStatusLabel.repaint();
                 topOptions.revalidate();
                 topOptions.repaint();
-                
                 notesArea.setEnabled(true);
             });
         });
         leftControls.add(clearPdfBtn);
 
-        // Add the grouped controls to the WEST (left) side
         topOptions.add(leftControls, BorderLayout.WEST);
 
-        // Right side: Status Label (takes remaining space, won't clip)
         pdfStatusLabel = new JLabel("No PDF selected (Using text area)");
         pdfStatusLabel.setForeground(TEXT_SECONDARY);
         topOptions.add(pdfStatusLabel, BorderLayout.CENTER);
 
-        headerPanel.add(topOptions, BorderLayout.SOUTH);
+        optionsContainer.add(topOptions, BorderLayout.SOUTH);
+        headerPanel.add(optionsContainer, BorderLayout.CENTER);
 
         panel.add(headerPanel, BorderLayout.NORTH);
 
@@ -412,7 +429,7 @@ public class EliteLearnGUI extends JFrame {
     }
 
     // ==========================================
-    // LOGIC & HELPERS
+    // LOGIC & HELPERS (Including Export/Import)
     // ==========================================
 
     private void refreshDeckList() {
@@ -424,8 +441,6 @@ public class EliteLearnGUI extends JFrame {
 
     private void generateDeck() {
         int numCards = (int) numCardsSpinner.getValue();
-        
-        // Validate inputs
         if (selectedPdf == null && notesArea.getText().trim().isEmpty()) {
             JOptionPane.showMessageDialog(this, "Please enter notes or upload a PDF first.");
             return;
@@ -435,7 +450,6 @@ public class EliteLearnGUI extends JFrame {
             return;
         }
 
-        // Run AI in background thread
         SwingWorker<List<Flashcard>, Void> worker = new SwingWorker<>() {
             @Override
             protected List<Flashcard> doInBackground() throws Exception {
@@ -463,6 +477,56 @@ public class EliteLearnGUI extends JFrame {
             }
         };
         worker.execute();
+    }
+
+    // --- EXPORT LOGIC ---
+    private void exportDeck(Deck deck) {
+        JFileChooser fc = new JFileChooser();
+        fc.setDialogTitle("Export Deck");
+        fc.setSelectedFile(new File(deck.getName() + ".json"));
+        fc.setFileFilter(new FileNameExtensionFilter("JSON Deck File", "json"));
+
+        if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            File file = fc.getSelectedFile();
+            if (!file.getName().toLowerCase().endsWith(".json")) {
+                file = new File(file.getAbsolutePath() + ".json");
+            }
+            try {
+                // Gson converts the Java object directly into a JSON string
+                String json = gson.toJson(deck);
+                Files.writeString(file.toPath(), json);
+                JOptionPane.showMessageDialog(this, "Deck exported successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this, "Error exporting deck: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    // --- IMPORT LOGIC ---
+    private void importDeck() {
+        JFileChooser fc = new JFileChooser();
+        fc.setDialogTitle("Import Deck");
+        fc.setFileFilter(new FileNameExtensionFilter("JSON Deck File", "json"));
+
+        if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            File file = fc.getSelectedFile();
+            try {
+                // Read the file content and convert it back into a Deck object
+                String json = Files.readString(file.toPath());
+                Deck importedDeck = gson.fromJson(json, Deck.class);
+
+                if (importedDeck != null && importedDeck.getName() != null) {
+                    decks.add(importedDeck);
+                    refreshDeckList();
+                    cardLayout.show(contentPanel, "DECKS");
+                    JOptionPane.showMessageDialog(this, "Deck '" + importedDeck.getName() + "' imported successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(this, "Invalid deck file format.", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this, "Error importing deck: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
     }
 
     private void startStudySession(Deck deck) {
@@ -520,6 +584,7 @@ public class EliteLearnGUI extends JFrame {
 
     private class DeckCellRenderer extends JPanel implements ListCellRenderer<Deck> {
         private JLabel titleLabel = new JLabel();
+        private JButton exportBtn = new JButton("Export");
         private JButton deleteBtn = new JButton("Delete");
 
         public DeckCellRenderer() {
@@ -531,14 +596,28 @@ public class EliteLearnGUI extends JFrame {
             titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
             titleLabel.setOpaque(false);
 
+            // Style Export Button
+            exportBtn.setForeground(ACCENT_BLUE);
+            exportBtn.setBackground(BG_CARD);
+            exportBtn.setBorder(new LineBorder(ACCENT_BLUE, 1));
+            exportBtn.setFocusPainted(false);
+            exportBtn.setPreferredSize(new Dimension(80, 30));
+
+            // Style Delete Button
             deleteBtn.setForeground(ACCENT_RED);
             deleteBtn.setBackground(BG_CARD);
             deleteBtn.setBorder(new LineBorder(ACCENT_RED, 1));
             deleteBtn.setFocusPainted(false);
             deleteBtn.setPreferredSize(new Dimension(80, 30));
 
+            // Group buttons on the right
+            JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+            rightPanel.setOpaque(false);
+            rightPanel.add(exportBtn);
+            rightPanel.add(deleteBtn);
+
             add(titleLabel, BorderLayout.CENTER);
-            add(deleteBtn, BorderLayout.EAST);
+            add(rightPanel, BorderLayout.EAST);
         }
 
         @Override

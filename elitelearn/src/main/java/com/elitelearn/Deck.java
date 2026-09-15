@@ -7,7 +7,13 @@ import java.util.Random;
 public class Deck {
     private String name;
     private List<Flashcard> flashcards;
-    private final Random random;
+    private transient final Random random;
+
+    // FIX: Gson requires a no-arg constructor to deserialize JSON back into a Java object!
+    public Deck() {
+        this.flashcards = new ArrayList<>();
+        this.random = new Random();
+    }
 
     public Deck(String name) {
         this.name = name;
@@ -84,4 +90,7 @@ public class Deck {
             card.setWeight(card.getWeight() * 1.8); 
         }
     }
+
+    public void setName(String name) { this.name = name; }
+    public List<Flashcard> getFlashcards() { return flashcards; }
 }
