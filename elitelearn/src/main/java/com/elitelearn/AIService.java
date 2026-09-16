@@ -17,9 +17,16 @@ import java.util.List;
 
 public class AIService {
     private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
-    private static final String MODEL = "gemini-3.6-flash"; 
+    private static final String MODEL = "gemini-3.6-flash";
     private final HttpClient httpClient;
     private final Gson gson;
+    
+    // Simple class to hold the AI's grading response
+    public static class GradeResult {
+        public int score; // 1 to 10
+        public String grade; // "CORRECT", "PARTIAL", or "INCORRECT"
+        public String explanation;
+    }
 
     public AIService() {
         this.httpClient = HttpClient.newBuilder()
@@ -33,21 +40,47 @@ public class AIService {
     public List<Flashcard> generateFlashcards(String rawNotes, int numCards, String apiKey) throws Exception {
         String prompt = buildPrompt(numCards, "the following class notes", rawNotes);
         JsonObject payload = buildPayload(prompt, null, null);
-        return sendRequest(payload, apiKey);
+        String jsonText = sendRequestAndGetText(payload, apiKey);
+        TypeToken<List<Flashcard>> typeToken = new TypeToken<List<Flashcard>>() {};
+        return gson.fromJson(jsonText, typeToken.getType());
     }
 
     public List<Flashcard> generateFlashcardsFromPdf(File pdfFile, int numCards, String apiKey) throws Exception {
         String prompt = buildPrompt(numCards, "the provided PDF document", "");
-        
-        // Read PDF and convert to Base64
         byte[] fileBytes = Files.readAllBytes(pdfFile.toPath());
         String base64Data = Base64.getEncoder().encodeToString(fileBytes);
-        
         JsonObject payload = buildPayload(prompt, "application/pdf", base64Data);
-        return sendRequest(payload, apiKey);
+        String jsonText = sendRequestAndGetText(payload, apiKey);
+        TypeToken<List<Flashcard>> typeToken = new TypeToken<List<Flashcard>>() {};
+        return gson.fromJson(jsonText, typeToken.getType());
+    }
+
+    public GradeResult gradeAnswer(String question, String expectedAnswer, String userAnswer, String apiKey) throws Exception {
+        String prompt = """
+                You are an expert grader. Evaluate the user's answer to a flashcard question.
+                
+                Question: %s
+                Expected Answer: %s
+                User's Answer: %s
+                
+                Grade the user's answer with:
+                1. A numerical score from 1 to 10.
+                2. A categorical grade: exactly one of "CORRECT", "PARTIAL", or "INCORRECT".
+                3. A concise explanation focusing specifically on the difference between the user's answer and the expected answer.
+                
+                You MUST output ONLY a valid JSON object with exactly these three keys:
+                - "score": integer (1 to 10)
+                - "grade": string ("CORRECT", "PARTIAL", or "INCORRECT")
+                - "explanation": string
+                """.formatted(question, expectedAnswer, userAnswer);
+
+        JsonObject payload = buildPayload(prompt, null, null);
+        String jsonText = sendRequestAndGetText(payload, apiKey);
+        return gson.fromJson(jsonText, GradeResult.class);
     }
 
     // --- Private Helper Methods ---
+
     private String buildPrompt(int numCards, String sourceDescription, String rawNotes) {
         return """
                 You are an expert educational assistant. Convert %s into exactly %d flashcard-style questions and answers.
@@ -72,17 +105,14 @@ public class AIService {
         contentObj.addProperty("role", "user");
         JsonArray partsArray = new JsonArray();
 
-        // 1. Add Text Part
         JsonObject textPart = new JsonObject();
         textPart.addProperty("text", promptText);
         partsArray.add(textPart);
 
-        // 2. Add Inline Data Part (if PDF)
         if (mimeType != null && base64Data != null) {
             JsonObject inlineData = new JsonObject();
             inlineData.addProperty("mime_type", mimeType);
             inlineData.addProperty("data", base64Data);
-            
             JsonObject dataPart = new JsonObject();
             dataPart.add("inline_data", inlineData);
             partsArray.add(dataPart);
@@ -92,7 +122,6 @@ public class AIService {
         contentsArray.add(contentObj);
         payloadObj.add("contents", contentsArray);
 
-        // Generation Config
         JsonObject generationConfig = new JsonObject();
         generationConfig.addProperty("temperature", 0.7);
         generationConfig.addProperty("responseMimeType", "application/json"); 
@@ -101,7 +130,8 @@ public class AIService {
         return payloadObj;
     }
 
-    private List<Flashcard> sendRequest(JsonObject payloadObj, String apiKey) throws Exception {
+    // Refactored to return the raw JSON text so it can be parsed into different objects
+    private String sendRequestAndGetText(JsonObject payloadObj, String apiKey) throws Exception {
         if (apiKey == null || apiKey.trim().isEmpty()) {
             throw new IllegalArgumentException("Google API Key cannot be empty.");
         }
@@ -128,9 +158,7 @@ public class AIService {
             throw new RuntimeException(errorMsg);
         }
 
-        String aiJsonText = extractContentFromGeminiResponse(response.body());
-        TypeToken<List<Flashcard>> typeToken = new TypeToken<List<Flashcard>>() {};
-        return gson.fromJson(aiJsonText, typeToken.getType());
+        return extractContentFromGeminiResponse(response.body());
     }
 
     private String extractContentFromGeminiResponse(String jsonResponse) {

@@ -26,6 +26,7 @@ public class EliteLearnGUI extends JFrame {
     private static final Color TEXT_SECONDARY = new Color(130, 130, 130);
     private static final Color ACCENT_BLUE = new Color(53, 116, 240);
     private static final Color ACCENT_RED = new Color(255, 85, 85);
+    private static final Color ACCENT_GREEN = new Color(46, 160, 67);
     private static final Font FONT_MAIN = new Font("Segoe UI", Font.PLAIN, 14);
     private static final Font FONT_TITLE = new Font("Segoe UI", Font.BOLD, 28);
     private static final Font FONT_SUBTITLE = new Font("Segoe UI", Font.ITALIC, 14);
@@ -34,7 +35,7 @@ public class EliteLearnGUI extends JFrame {
     private final List<Deck> decks = new java.util.ArrayList<>();
     private String apiKey = "";
     private final AIService aiService = new AIService();
-    private final Gson gson = new Gson(); // Added for Export/Import
+    private final Gson gson = new Gson();
     private Deck currentStudyDeck;
     private Flashcard currentStudyCard;
     private File selectedPdf = null;
@@ -47,9 +48,23 @@ public class EliteLearnGUI extends JFrame {
     private JTextArea notesArea;
     private JLabel studyQuestionLabel;
     private JLabel studyAnswerLabel;
-    private JButton revealBtn;
     private JSpinner numCardsSpinner;
     private JLabel pdfStatusLabel;
+
+    // --- Study Screen Specific Components ---
+    private JPanel inputPanel;
+    private JTextField userInputField;
+    private JButton submitAnswerBtn;
+    private JPanel feedbackPanel;
+    private JTextArea feedbackArea;
+    
+    private JButton revealBtn;
+    private JButton typeAnswerBtn;
+    private JButton skipBtn;
+    private JButton correctBtn;
+    private JButton incorrectBtn;
+    private JButton cancelInputBtn;
+    private JButton nextCardBtn;
 
     public EliteLearnGUI() {
         setTitle("EliteLearn");
@@ -157,7 +172,7 @@ public class EliteLearnGUI extends JFrame {
     }
 
     // ==========================================
-    // 3. DECKS SCREEN (Added Export Button)
+    // 3. DECKS SCREEN
     // ==========================================
     private JPanel buildDecksScreen() {
         JPanel mainPanel = new JPanel(new BorderLayout());
@@ -181,7 +196,6 @@ public class EliteLearnGUI extends JFrame {
         deckList.setDropMode(DropMode.INSERT);
         deckList.setTransferHandler(new DeckTransferHandler());
 
-        // Mouse Listener for Delete, Export, and Opening Deck
         deckList.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseReleased(MouseEvent e) {
@@ -190,20 +204,14 @@ public class EliteLearnGUI extends JFrame {
                     Rectangle cellBounds = deckList.getCellBounds(index, index);
                     if (cellBounds != null && cellBounds.contains(e.getPoint())) {
                         int rightEdge = cellBounds.x + cellBounds.width;
-                        
-                        // The right panel containing buttons is roughly 190px wide (Export 80 + gap 10 + Delete 80 + padding 20)
                         if (e.getX() > rightEdge - 190) {
-                            // We clicked in the button area. Which one?
-                            // Delete is the rightmost 90px
                             if (e.getX() > rightEdge - 90) {
                                 decks.remove(index);
                                 refreshDeckList();
                             } else {
-                                // Otherwise, it's the Export button
                                 exportDeck(deckListModel.get(index));
                             }
                         } else {
-                            // Clicked on the text -> Open Study Session
                             startStudySession(deckListModel.get(index));
                         }
                     }
@@ -244,7 +252,7 @@ public class EliteLearnGUI extends JFrame {
     }
 
     // ==========================================
-    // 4. NEW DECK SCREEN (Added Import Button)
+    // 4. NEW DECK SCREEN
     // ==========================================
     private JPanel buildNewDeckScreen() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
@@ -259,11 +267,9 @@ public class EliteLearnGUI extends JFrame {
         title.setForeground(Color.WHITE);
         headerPanel.add(title, BorderLayout.NORTH);
 
-        // Container for the options to allow stacking Import above the rest
         JPanel optionsContainer = new JPanel(new BorderLayout(0, 10));
         optionsContainer.setBackground(BG_MAIN);
 
-        // --- IMPORT ROW (Placed at the top) ---
         JPanel importRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
         importRow.setBackground(BG_MAIN);
         JButton importBtn = createStyledButton("Import Deck from File", ACCENT_BLUE, false);
@@ -271,7 +277,6 @@ public class EliteLearnGUI extends JFrame {
         importRow.add(importBtn);
         optionsContainer.add(importRow, BorderLayout.NORTH);
 
-        // --- OPTIONS ROW (Placed below Import) ---
         JPanel topOptions = new JPanel(new BorderLayout(15, 0));
         topOptions.setBackground(BG_MAIN);
 
@@ -335,7 +340,6 @@ public class EliteLearnGUI extends JFrame {
 
         panel.add(headerPanel, BorderLayout.NORTH);
 
-        // --- Center Text Area ---
         notesArea = new JTextArea();
         notesArea.setFont(FONT_MAIN);
         notesArea.setBackground(BG_INPUT);
@@ -350,7 +354,6 @@ public class EliteLearnGUI extends JFrame {
         scrollPane.setBorder(null);
         panel.add(scrollPane, BorderLayout.CENTER);
 
-        // --- Bottom Buttons ---
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         btnPanel.setBackground(BG_MAIN);
 
@@ -368,7 +371,7 @@ public class EliteLearnGUI extends JFrame {
     }
 
     // ==========================================
-    // 5. STUDY SCREEN
+    // 5. STUDY SCREEN (Added Skip & AI Grading)
     // ==========================================
     private JPanel buildStudyScreen() {
         JPanel panel = new JPanel(new BorderLayout(20, 20));
@@ -385,35 +388,117 @@ public class EliteLearnGUI extends JFrame {
         southPanel.setLayout(new BoxLayout(southPanel, BoxLayout.Y_AXIS));
         southPanel.setOpaque(false);
 
+        // 1. Standard Answer Reveal Label
         studyAnswerLabel = new JLabel("<html><center>Answer goes here</center></html>");
         studyAnswerLabel.setFont(new Font("Segoe UI", Font.PLAIN, 18));
         studyAnswerLabel.setForeground(ACCENT_BLUE);
         studyAnswerLabel.setHorizontalAlignment(SwingConstants.CENTER);
         studyAnswerLabel.setVisible(false);
         studyAnswerLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
         southPanel.add(studyAnswerLabel);
+        southPanel.add(Box.createVerticalStrut(10));
+
+        // 2. AI Grading Input Panel (Hidden by default)
+        inputPanel = new JPanel(new BorderLayout(10, 0));
+        inputPanel.setOpaque(false);
+        inputPanel.setVisible(false);
+        inputPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        
+        userInputField = new JTextField();
+        userInputField.setFont(FONT_MAIN);
+        userInputField.setBackground(BG_INPUT);
+        userInputField.setForeground(TEXT_PRIMARY);
+        userInputField.setCaretColor(TEXT_PRIMARY);
+        userInputField.setBorder(new LineBorder(BORDER_COLOR, 1));
+        userInputField.setMargin(new Insets(8, 10, 8, 10));
+        
+        submitAnswerBtn = createStyledButton("Submit to AI", ACCENT_BLUE, false);
+        submitAnswerBtn.addActionListener(e -> submitAnswerToAI());
+        
+        inputPanel.add(userInputField, BorderLayout.CENTER);
+        inputPanel.add(submitAnswerBtn, BorderLayout.EAST);
+        southPanel.add(inputPanel);
+        southPanel.add(Box.createVerticalStrut(10));
+
+        // 3. AI Feedback Panel (Hidden by default)
+        feedbackPanel = new JPanel(new BorderLayout());
+        feedbackPanel.setOpaque(false);
+        feedbackPanel.setVisible(false);
+        feedbackPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        
+        feedbackArea = new JTextArea(4, 40);
+        feedbackArea.setEditable(false);
+        feedbackArea.setLineWrap(true);
+        feedbackArea.setWrapStyleWord(true);
+        feedbackArea.setFont(FONT_MAIN);
+        feedbackArea.setBackground(BG_CARD);
+        feedbackArea.setForeground(TEXT_PRIMARY);
+        feedbackArea.setBorder(new LineBorder(BORDER_COLOR, 1));
+        feedbackArea.setMargin(new Insets(10, 10, 10, 10));
+        
+        JScrollPane feedbackScroll = new JScrollPane(feedbackArea);
+        feedbackScroll.setPreferredSize(new Dimension(600, 100));
+        feedbackPanel.add(feedbackScroll, BorderLayout.CENTER);
+        southPanel.add(feedbackPanel);
         southPanel.add(Box.createVerticalStrut(15));
 
-        JPanel bottomBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
+        // 4. Button Bar
+        JPanel bottomBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
         bottomBar.setOpaque(false);
 
+        // State 1 Buttons (Question Only)
         revealBtn = createStyledButton("Reveal Answer", ACCENT_BLUE, false);
         revealBtn.addActionListener(e -> {
-            boolean isCurrentlyVisible = studyAnswerLabel.isVisible();
-            studyAnswerLabel.setVisible(!isCurrentlyVisible);
-            revealBtn.setText(isCurrentlyVisible ? "Reveal Answer" : "Hide Answer");
+            studyAnswerLabel.setVisible(true);
+            toggleStudyButtons("REVEALED");
         });
 
-        JButton correctBtn = createStyledButton("Correct", new Color(46, 160, 67), false);
-        correctBtn.addActionListener(e -> handleStudyResult(true));
+        typeAnswerBtn = createStyledButton("Type My Answer", ACCENT_BLUE, false);
+        typeAnswerBtn.addActionListener(e -> {
+            inputPanel.setVisible(true);
+            userInputField.requestFocus();
+            toggleStudyButtons("TYPING");
+        });
 
-        JButton incorrectBtn = createStyledButton("Incorrect", ACCENT_RED, false);
-        incorrectBtn.addActionListener(e -> handleStudyResult(false));
+        skipBtn = createStyledButton("Skip", TEXT_SECONDARY, false);
+        skipBtn.addActionListener(e -> loadNextCard()); // Skip doesn't update weight!
+
+        // State 2 Buttons (Revealed)
+        correctBtn = createStyledButton("Correct", ACCENT_GREEN, false);
+        correctBtn.setVisible(false);
+        correctBtn.addActionListener(e -> {
+            currentStudyDeck.updateWeight(currentStudyCard, true);
+            loadNextCard();
+        });
+
+        incorrectBtn = createStyledButton("Incorrect", ACCENT_RED, false);
+        incorrectBtn.setVisible(false);
+        incorrectBtn.addActionListener(e -> {
+            currentStudyDeck.updateWeight(currentStudyCard, false);
+            loadNextCard();
+        });
+
+        // State 3 Buttons (Typing)
+        cancelInputBtn = createStyledButton("Cancel", TEXT_SECONDARY, false);
+        cancelInputBtn.setVisible(false);
+        cancelInputBtn.addActionListener(e -> {
+            inputPanel.setVisible(false);
+            userInputField.setText("");
+            toggleStudyButtons("INITIAL");
+        });
+
+        // State 4 Buttons (Graded)
+        nextCardBtn = createStyledButton("Next Card", ACCENT_BLUE, false);
+        nextCardBtn.setVisible(false);
+        nextCardBtn.addActionListener(e -> loadNextCard());
 
         bottomBar.add(revealBtn);
+        bottomBar.add(typeAnswerBtn);
+        bottomBar.add(skipBtn);
         bottomBar.add(correctBtn);
         bottomBar.add(incorrectBtn);
+        bottomBar.add(cancelInputBtn);
+        bottomBar.add(nextCardBtn);
 
         southPanel.add(bottomBar);
         panel.add(southPanel, BorderLayout.SOUTH);
@@ -429,8 +514,114 @@ public class EliteLearnGUI extends JFrame {
     }
 
     // ==========================================
-    // LOGIC & HELPERS (Including Export/Import)
+    // LOGIC & HELPERS
     // ==========================================
+
+    private void toggleStudyButtons(String state) {
+        // Hide all first
+        revealBtn.setVisible(false);
+        typeAnswerBtn.setVisible(false);
+        skipBtn.setVisible(false);
+        correctBtn.setVisible(false);
+        incorrectBtn.setVisible(false);
+        cancelInputBtn.setVisible(false);
+        nextCardBtn.setVisible(false);
+
+        switch (state) {
+            case "INITIAL":
+                revealBtn.setVisible(true);
+                typeAnswerBtn.setVisible(true);
+                skipBtn.setVisible(true);
+                break;
+            case "REVEALED":
+                correctBtn.setVisible(true);
+                incorrectBtn.setVisible(true);
+                skipBtn.setVisible(true);
+                break;
+            case "TYPING":
+                cancelInputBtn.setVisible(true);
+                skipBtn.setVisible(true);
+                break;
+            case "GRADED":
+                nextCardBtn.setVisible(true);
+                break;
+        }
+    }
+
+    private void submitAnswerToAI() {
+        String userAnswer = userInputField.getText().trim();
+        if (userAnswer.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please type an answer first.");
+            return;
+        }
+
+        // Disable input while waiting for AI
+        userInputField.setEnabled(false);
+        submitAnswerBtn.setEnabled(false);
+        submitAnswerBtn.setText("Grading...");
+
+        SwingWorker<AIService.GradeResult, Void> worker = new SwingWorker<>() {
+            @Override
+            protected AIService.GradeResult doInBackground() throws Exception {
+                return aiService.gradeAnswer(
+                        currentStudyCard.getQuestion(), 
+                        currentStudyCard.getAnswer(), 
+                        userAnswer, 
+                        apiKey
+                );
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    AIService.GradeResult result = get();
+                    
+                    // Format the feedback with both Score and Grade
+                    String feedbackText = String.format(
+                        "Score: %d/10 | Grade: %s\n\n" +
+                        "Correct Answer:\n%s\n\n" +
+                        "AI Feedback:\n%s", 
+                        result.score, result.grade, 
+                        currentStudyCard.getAnswer(), 
+                        result.explanation
+                    );
+                    feedbackArea.setText(feedbackText);
+                    
+                    // Color-code the feedback based on the grade
+                    if (result.grade != null && result.grade.equalsIgnoreCase("CORRECT")) {
+                        feedbackArea.setForeground(new Color(46, 160, 67)); // Green
+                    } else if (result.grade != null && result.grade.equalsIgnoreCase("PARTIAL")) {
+                        feedbackArea.setForeground(new Color(240, 180, 50)); // Yellow/Orange
+                    } else {
+                        feedbackArea.setForeground(ACCENT_RED); // Red
+                    }
+
+                    feedbackPanel.setVisible(true);
+                    inputPanel.setVisible(false);
+                    
+                    // 3. Update weight strictly based on the numerical score
+                    if (result.score >= 9) {
+                        // 9-10: Marked correct (decrease weight)
+                        currentStudyDeck.updateWeight(currentStudyCard, true);
+                    } else if (result.score <= 7) {
+                        // 0-7: Marked incorrect (increase weight)
+                        currentStudyDeck.updateWeight(currentStudyCard, false);
+                    }
+                    // If score == 8: Do nothing, weight remains unchanged!
+                    
+                    toggleStudyButtons("GRADED");
+                    
+                } catch (Exception e) {
+                    JOptionPane.showMessageDialog(EliteLearnGUI.this, "Error grading answer: " + e.getMessage(), "API Error", JOptionPane.ERROR_MESSAGE);
+                    // Re-enable input on failure
+                    userInputField.setEnabled(true);
+                    submitAnswerBtn.setEnabled(true);
+                    submitAnswerBtn.setText("Submit to AI");
+                }
+            }
+        };
+        worker.execute();
+    }
 
     private void refreshDeckList() {
         deckListModel.clear();
@@ -479,7 +670,6 @@ public class EliteLearnGUI extends JFrame {
         worker.execute();
     }
 
-    // --- EXPORT LOGIC ---
     private void exportDeck(Deck deck) {
         JFileChooser fc = new JFileChooser();
         fc.setDialogTitle("Export Deck");
@@ -492,7 +682,6 @@ public class EliteLearnGUI extends JFrame {
                 file = new File(file.getAbsolutePath() + ".json");
             }
             try {
-                // Gson converts the Java object directly into a JSON string
                 String json = gson.toJson(deck);
                 Files.writeString(file.toPath(), json);
                 JOptionPane.showMessageDialog(this, "Deck exported successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
@@ -502,7 +691,6 @@ public class EliteLearnGUI extends JFrame {
         }
     }
 
-    // --- IMPORT LOGIC ---
     private void importDeck() {
         JFileChooser fc = new JFileChooser();
         fc.setDialogTitle("Import Deck");
@@ -511,7 +699,6 @@ public class EliteLearnGUI extends JFrame {
         if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             File file = fc.getSelectedFile();
             try {
-                // Read the file content and convert it back into a Deck object
                 String json = Files.readString(file.toPath());
                 Deck importedDeck = gson.fromJson(json, Deck.class);
 
@@ -546,16 +733,20 @@ public class EliteLearnGUI extends JFrame {
             cardLayout.show(contentPanel, "DECKS");
             return;
         }
+        
         studyQuestionLabel.setText("<html><center>" + currentStudyCard.getQuestion() + "</center></html>");
         studyAnswerLabel.setText("<html><center>" + currentStudyCard.getAnswer() + "</center></html>");
+        
+        // Reset all UI states for the new card
         studyAnswerLabel.setVisible(false);
-        revealBtn.setText("Reveal Answer"); 
-        revealBtn.setEnabled(true);
-    }
-
-    private void handleStudyResult(boolean isCorrect) {
-        currentStudyDeck.updateWeight(currentStudyCard, isCorrect);
-        loadNextCard();
+        inputPanel.setVisible(false);
+        feedbackPanel.setVisible(false);
+        userInputField.setText("");
+        userInputField.setEnabled(true);
+        submitAnswerBtn.setEnabled(true);
+        submitAnswerBtn.setText("Submit to AI");
+        
+        toggleStudyButtons("INITIAL");
     }
 
     // --- Custom UI Helpers ---
@@ -575,7 +766,7 @@ public class EliteLearnGUI extends JFrame {
             btn.setForeground(themeColor);
         }
         btn.setBorder(new LineBorder(themeColor, 1, true));
-        btn.setMargin(new Insets(12, 35, 12, 35)); 
+        btn.setMargin(new Insets(10, 25, 10, 25)); 
 
         return btn;
     }
@@ -596,21 +787,18 @@ public class EliteLearnGUI extends JFrame {
             titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
             titleLabel.setOpaque(false);
 
-            // Style Export Button
             exportBtn.setForeground(ACCENT_BLUE);
             exportBtn.setBackground(BG_CARD);
             exportBtn.setBorder(new LineBorder(ACCENT_BLUE, 1));
             exportBtn.setFocusPainted(false);
             exportBtn.setPreferredSize(new Dimension(80, 30));
 
-            // Style Delete Button
             deleteBtn.setForeground(ACCENT_RED);
             deleteBtn.setBackground(BG_CARD);
             deleteBtn.setBorder(new LineBorder(ACCENT_RED, 1));
             deleteBtn.setFocusPainted(false);
             deleteBtn.setPreferredSize(new Dimension(80, 30));
 
-            // Group buttons on the right
             JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
             rightPanel.setOpaque(false);
             rightPanel.add(exportBtn);
