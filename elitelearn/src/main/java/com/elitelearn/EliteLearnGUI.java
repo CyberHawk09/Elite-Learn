@@ -153,14 +153,24 @@ public class EliteLearnGUI extends JFrame {
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 20));
         btnPanel.setBackground(BG_MAIN);
 
+        // --- CONFIRM BUTTON ---
         JButton confirmBtn = createStyledButton("Confirm", ACCENT_BLUE, false);
         confirmBtn.addActionListener(e -> {
+            // 1. ONLY update the variable when Confirm is clicked
             apiKey = new String(apiKeyField.getPassword());
+            // 2. Clear the field for security
+            apiKeyField.setText(""); 
             cardLayout.show(contentPanel, "MAIN");
         });
 
+        // --- CANCEL BUTTON ---
         JButton cancelBtn = createStyledButton("Cancel", ACCENT_BLUE, false);
-        cancelBtn.addActionListener(e -> cardLayout.show(contentPanel, "MAIN"));
+        cancelBtn.addActionListener(e -> {
+            // 1. DO NOT touch the apiKey variable.
+            // 2. Just clear the text field so it doesn't linger on screen
+            apiKeyField.setText(""); 
+            cardLayout.show(contentPanel, "MAIN");
+        });
 
         btnPanel.add(confirmBtn);
         btnPanel.add(cancelBtn);
