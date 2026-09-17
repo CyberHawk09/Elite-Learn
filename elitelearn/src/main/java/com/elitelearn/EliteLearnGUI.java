@@ -38,7 +38,7 @@ public class EliteLearnGUI extends JFrame {
     private final Gson gson = new Gson();
     private Deck currentStudyDeck;
     private Flashcard currentStudyCard;
-    private File selectedPdf = null;
+private final List<File> selectedPdfs = new java.util.ArrayList<>();
 
     // --- UI Components ---
     private JPanel contentPanel;
@@ -248,7 +248,8 @@ public class EliteLearnGUI extends JFrame {
         addBtn.setFocusPainted(false);
         addBtn.addActionListener(e -> {
             notesArea.setText("");
-            selectedPdf = null;
+            selectedPdfs.clear(); // Clear the list
+            updatePdfStatusLabel(); // Update the label dynamically
             pdfStatusLabel.setText("No PDF selected (Using text area)");
             pdfStatusLabel.setForeground(TEXT_SECONDARY);
             notesArea.setEnabled(true);
@@ -261,10 +262,10 @@ public class EliteLearnGUI extends JFrame {
         return mainPanel;
     }
 
+        // ==========================================
+    // 4. NEW DECK/TEST SCREEN
     // ==========================================
-    // 4. NEW DECK SCREEN
-    // ==========================================
-    private JPanel buildNewDeckScreen() {
+        private JPanel buildNewDeckScreen() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBackground(BG_MAIN);
         panel.setBorder(new EmptyBorder(20, 20, 20, 20));
@@ -272,14 +273,32 @@ public class EliteLearnGUI extends JFrame {
         JPanel headerPanel = new JPanel(new BorderLayout(0, 10));
         headerPanel.setBackground(BG_MAIN);
 
-        JLabel title = new JLabel("Create New Deck");
+        JLabel title = new JLabel("Create New Deck or Test");
         title.setFont(new Font("Segoe UI", Font.BOLD, 18));
         title.setForeground(Color.WHITE);
         headerPanel.add(title, BorderLayout.NORTH);
 
+        // Mode Selection Dropdown
+        JPanel modePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 5));
+        modePanel.setBackground(BG_MAIN);
+
+        JLabel modeLabel = new JLabel("Create:");
+        modeLabel.setForeground(TEXT_PRIMARY);
+        modePanel.add(modeLabel);
+
+        String[] modes = {"Flashcard Deck", "Test (PDF)"};
+        JComboBox<String> modeDropdown = new JComboBox<>(modes);
+        modeDropdown.setFont(FONT_MAIN);
+        modeDropdown.setBackground(BG_INPUT);
+        modeDropdown.setForeground(TEXT_PRIMARY);
+        modePanel.add(modeDropdown);
+
+        headerPanel.add(modePanel, BorderLayout.NORTH);
+
         JPanel optionsContainer = new JPanel(new BorderLayout(0, 10));
         optionsContainer.setBackground(BG_MAIN);
 
+        // Import Row
         JPanel importRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
         importRow.setBackground(BG_MAIN);
         JButton importBtn = createStyledButton("Import Deck from File", ACCENT_BLUE, false);
@@ -287,13 +306,33 @@ public class EliteLearnGUI extends JFrame {
         importRow.add(importBtn);
         optionsContainer.add(importRow, BorderLayout.NORTH);
 
+        // Test-Specific Options (Initially Hidden) - Only Teacher Name now
+        JPanel testOptionsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
+        testOptionsPanel.setBackground(BG_MAIN);
+        testOptionsPanel.setVisible(false);
+
+        JLabel teacherLabel = new JLabel("Teacher Name:");
+        teacherLabel.setForeground(TEXT_PRIMARY);
+        JTextField teacherField = new JTextField(20);
+        teacherField.setFont(FONT_MAIN);
+        teacherField.setBackground(BG_INPUT);
+        teacherField.setForeground(TEXT_PRIMARY);
+        teacherField.setBorder(new LineBorder(BORDER_COLOR, 1));
+        teacherField.setMargin(new Insets(5, 10, 5, 10));
+
+        testOptionsPanel.add(teacherLabel);
+        testOptionsPanel.add(teacherField);
+
+        optionsContainer.add(testOptionsPanel, BorderLayout.CENTER);
+
+        // Regular Options Row
         JPanel topOptions = new JPanel(new BorderLayout(15, 0));
         topOptions.setBackground(BG_MAIN);
 
         JPanel leftControls = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
         leftControls.setBackground(BG_MAIN);
 
-        JLabel numLabel = new JLabel("Cards (1-100):");
+        JLabel numLabel = new JLabel("Cards/Questions (1-100):");
         numLabel.setForeground(TEXT_PRIMARY);
         leftControls.add(numLabel);
 
@@ -304,15 +343,20 @@ public class EliteLearnGUI extends JFrame {
         ((JSpinner.DefaultEditor) editor).getTextField().setCaretColor(TEXT_PRIMARY);
         leftControls.add(numCardsSpinner);
 
-        JButton uploadPdfBtn = createStyledButton("Upload PDF", ACCENT_BLUE, false);
+        JButton uploadPdfBtn = createStyledButton("Upload PDF(s)", ACCENT_BLUE, false);
         uploadPdfBtn.addActionListener(e -> {
             JFileChooser fc = new JFileChooser();
+            fc.setMultiSelectionEnabled(true); // FIX: Allow selecting multiple files at once
             fc.setFileFilter(new FileNameExtensionFilter("PDF Documents", "pdf"));
             if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-                selectedPdf = fc.getSelectedFile();
+                File[] files = fc.getSelectedFiles();
+                for (File f : files) {
+                    if (!selectedPdfs.contains(f)) {
+                        selectedPdfs.add(f);
+                    }
+                }
                 SwingUtilities.invokeLater(() -> {
-                    pdfStatusLabel.setText("Selected: " + selectedPdf.getName());
-                    pdfStatusLabel.setForeground(ACCENT_BLUE);
+                    updatePdfStatusLabel();
                     pdfStatusLabel.revalidate();
                     pdfStatusLabel.repaint();
                     topOptions.revalidate();
@@ -324,12 +368,11 @@ public class EliteLearnGUI extends JFrame {
         });
         leftControls.add(uploadPdfBtn);
 
-        JButton clearPdfBtn = createStyledButton("Clear PDF", TEXT_SECONDARY, false);
+        JButton clearPdfBtn = createStyledButton("Clear PDFs", TEXT_SECONDARY, false);
         clearPdfBtn.addActionListener(e -> {
-            selectedPdf = null;
+            selectedPdfs.clear(); // FIX: Clear the whole list
             SwingUtilities.invokeLater(() -> {
-                pdfStatusLabel.setText("No PDF selected (Using text area)");
-                pdfStatusLabel.setForeground(TEXT_SECONDARY);
+                updatePdfStatusLabel();
                 pdfStatusLabel.revalidate();
                 pdfStatusLabel.repaint();
                 topOptions.revalidate();
@@ -350,6 +393,7 @@ public class EliteLearnGUI extends JFrame {
 
         panel.add(headerPanel, BorderLayout.NORTH);
 
+        // Notes Area
         notesArea = new JTextArea();
         notesArea.setFont(FONT_MAIN);
         notesArea.setBackground(BG_INPUT);
@@ -364,18 +408,40 @@ public class EliteLearnGUI extends JFrame {
         scrollPane.setBorder(null);
         panel.add(scrollPane, BorderLayout.CENTER);
 
+        // Bottom Buttons
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         btnPanel.setBackground(BG_MAIN);
 
         JButton cancelBtn = createStyledButton("Cancel", ACCENT_BLUE, false);
         cancelBtn.addActionListener(e -> cardLayout.show(contentPanel, "DECKS"));
 
-        JButton generateBtn = createStyledButton("Generate Flashcards", ACCENT_BLUE, false);
-        generateBtn.addActionListener(e -> generateDeck());
+        JButton generateBtn = createStyledButton("Generate", ACCENT_BLUE, false);
+        generateBtn.addActionListener(e -> {
+            String selectedMode = (String) modeDropdown.getSelectedItem();
+            if ("Test (PDF)".equals(selectedMode)) {
+                generateTest(teacherField.getText());
+            } else {
+                generateDeck();
+            }
+        });
 
         btnPanel.add(cancelBtn);
         btnPanel.add(generateBtn);
         panel.add(btnPanel, BorderLayout.SOUTH);
+
+        // Mode Change Listener
+        modeDropdown.addActionListener(e -> {
+            String selectedMode = (String) modeDropdown.getSelectedItem();
+            if ("Test (PDF)".equals(selectedMode)) {
+                testOptionsPanel.setVisible(true);
+                numLabel.setText("Questions (1-100):");
+            } else {
+                testOptionsPanel.setVisible(false);
+                numLabel.setText("Cards (1-100):");
+            }
+            panel.revalidate();
+            panel.repaint();
+        });
 
         return panel;
     }
@@ -640,9 +706,29 @@ public class EliteLearnGUI extends JFrame {
         }
     }
 
+        private void updatePdfStatusLabel() {
+        if (selectedPdfs.isEmpty()) {
+            pdfStatusLabel.setText("No PDFs selected (Using text area)");
+            pdfStatusLabel.setForeground(TEXT_SECONDARY);
+        } else {
+            String text = selectedPdfs.size() + " PDF(s) selected";
+            if (selectedPdfs.size() <= 2) {
+                // If it's just 1 or 2 files, show their actual names
+                StringBuilder sb = new StringBuilder();
+                for(int i=0; i<selectedPdfs.size(); i++) {
+                    sb.append(selectedPdfs.get(i).getName());
+                    if(i < selectedPdfs.size() - 1) sb.append(", ");
+                }
+                text = sb.toString();
+            }
+            pdfStatusLabel.setText(text);
+            pdfStatusLabel.setForeground(ACCENT_BLUE);
+        }
+    }
+
     private void generateDeck() {
         int numCards = (int) numCardsSpinner.getValue();
-        if (selectedPdf == null && notesArea.getText().trim().isEmpty()) {
+        if (selectedPdfs.isEmpty() && notesArea.getText().trim().isEmpty()) {
             JOptionPane.showMessageDialog(this, "Please enter notes or upload a PDF first.");
             return;
         }
@@ -654,8 +740,8 @@ public class EliteLearnGUI extends JFrame {
         SwingWorker<List<Flashcard>, Void> worker = new SwingWorker<>() {
             @Override
             protected List<Flashcard> doInBackground() throws Exception {
-                if (selectedPdf != null) {
-                    return aiService.generateFlashcardsFromPdf(selectedPdf, numCards, apiKey);
+                if (!selectedPdfs.isEmpty()) {
+                    return aiService.generateFlashcardsFromPdfs(selectedPdfs, numCards, apiKey);
                 } else {
                     return aiService.generateFlashcards(notesArea.getText(), numCards, apiKey);
                 }
@@ -674,6 +760,81 @@ public class EliteLearnGUI extends JFrame {
                     }
                 } catch (Exception e) {
                     JOptionPane.showMessageDialog(EliteLearnGUI.this, "Error generating cards: " + e.getMessage(), "API Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private void generateTest(String teacherName) {
+        int numQuestions = (int) numCardsSpinner.getValue();
+
+        if (selectedPdfs.isEmpty() && notesArea.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please enter notes or upload a PDF first.");
+            return;
+        }
+        if (apiKey.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please set your API key first.");
+            return;
+        }
+
+        SwingWorker<List<Flashcard>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected List<Flashcard> doInBackground() throws Exception {
+                if (!selectedPdfs.isEmpty()) {
+                    return aiService.generateFlashcardsFromPdfs(selectedPdfs, numQuestions, apiKey);
+                } else {
+                    return aiService.generateFlashcards(notesArea.getText(), numQuestions, apiKey);
+                }
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    List<Flashcard> questions = get();
+                    String testName = JOptionPane.showInputDialog(EliteLearnGUI.this,
+                            "Enter a name for your test:", "New Test", JOptionPane.PLAIN_MESSAGE);
+
+                    if (testName != null && !testName.trim().isEmpty()) {
+                        // Save Test PDF
+                        JFileChooser testFC = new JFileChooser();
+                        testFC.setDialogTitle("Save Test PDF");
+                        testFC.setSelectedFile(new File(testName + "_Test.pdf"));
+                        testFC.setFileFilter(new FileNameExtensionFilter("PDF Files", "pdf"));
+
+                        if (testFC.showSaveDialog(EliteLearnGUI.this) == JFileChooser.APPROVE_OPTION) {
+                            File testFile = testFC.getSelectedFile();
+                            if (!testFile.getName().toLowerCase().endsWith(".pdf")) {
+                                testFile = new File(testFile.getAbsolutePath() + ".pdf");
+                            }
+
+                            TestGenerator.generateTestPDF(testName, teacherName, questions, testFile);
+
+                            // Save Answer Key PDF
+                            JFileChooser keyFC = new JFileChooser();
+                            keyFC.setDialogTitle("Save Answer Key PDF");
+                            keyFC.setSelectedFile(new File(testName + "_AnswerKey.pdf"));
+                            keyFC.setFileFilter(new FileNameExtensionFilter("PDF Files", "pdf"));
+
+                            if (keyFC.showSaveDialog(EliteLearnGUI.this) == JFileChooser.APPROVE_OPTION) {
+                                File keyFile = keyFC.getSelectedFile();
+                                if (!keyFile.getName().toLowerCase().endsWith(".pdf")) {
+                                    keyFile = new File(keyFile.getAbsolutePath() + ".pdf");
+                                }
+
+                                TestGenerator.generateAnswerKeyPDF(testName, teacherName, questions, keyFile);
+
+                                JOptionPane.showMessageDialog(EliteLearnGUI.this,
+                                        "Test and Answer Key generated successfully!",
+                                        "Success", JOptionPane.INFORMATION_MESSAGE);
+                                cardLayout.show(contentPanel, "DECKS");
+                            }
+                        }
+                    }
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(EliteLearnGUI.this,
+                            "Error generating test: " + ex.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
                 }
             }
         };

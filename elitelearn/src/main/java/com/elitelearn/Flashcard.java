@@ -4,6 +4,7 @@ public class Flashcard {
     private String question;
     private String answer;
     private double weight = 1.0; // Changed to double to match getter/setter and Gson expectations
+    private int linesNeeded = 3;
 
     // No-arg constructor required for Gson deserialization
     public Flashcard() {
@@ -23,6 +24,9 @@ public class Flashcard {
     
     public double getWeight() { return weight; }
     public void setWeight(double weight) { this.weight = weight; }
+
+    public int getLinesNeeded() { return linesNeeded; }
+    public void setLinesNeeded(int linesNeeded) { this.linesNeeded = linesNeeded; }
 
     @Override
     public String toString() {

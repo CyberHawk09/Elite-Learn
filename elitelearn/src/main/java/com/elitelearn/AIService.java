@@ -12,6 +12,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 
@@ -20,11 +21,10 @@ public class AIService {
     private static final String MODEL = "gemini-3.6-flash";
     private final HttpClient httpClient;
     private final Gson gson;
-    
-    // Simple class to hold the AI's grading response
+
     public static class GradeResult {
-        public int score; // 1 to 10
-        public String grade; // "CORRECT", "PARTIAL", or "INCORRECT"
+        public int score; 
+        public String grade; 
         public String explanation;
     }
 
@@ -45,28 +45,36 @@ public class AIService {
         return gson.fromJson(jsonText, typeToken.getType());
     }
 
-    public List<Flashcard> generateFlashcardsFromPdf(File pdfFile, int numCards, String apiKey) throws Exception {
-        String prompt = buildPrompt(numCards, "the provided PDF document", "");
-        byte[] fileBytes = Files.readAllBytes(pdfFile.toPath());
-        String base64Data = Base64.getEncoder().encodeToString(fileBytes);
-        JsonObject payload = buildPayload(prompt, "application/pdf", base64Data);
+    // UPDATED: Now accepts a List of Files instead of a single File
+    public List<Flashcard> generateFlashcardsFromPdfs(List<File> pdfFiles, int numCards, String apiKey) throws Exception {
+        String prompt = buildPrompt(numCards, "the provided PDF documents", "");
+        
+        // Read and encode all PDFs
+        List<String> base64Datas = new ArrayList<>();
+        for (File pdf : pdfFiles) {
+            byte[] fileBytes = Files.readAllBytes(pdf.toPath());
+            base64Datas.add(Base64.getEncoder().encodeToString(fileBytes));
+        }
+        
+        JsonObject payload = buildPayload(prompt, "application/pdf", base64Datas);
         String jsonText = sendRequestAndGetText(payload, apiKey);
         TypeToken<List<Flashcard>> typeToken = new TypeToken<List<Flashcard>>() {};
         return gson.fromJson(jsonText, typeToken.getType());
     }
 
+    // UPDATED: Prompt now refers to the student as "you" and "my"
     public GradeResult gradeAnswer(String question, String expectedAnswer, String userAnswer, String apiKey) throws Exception {
         String prompt = """
-                You are an expert grader. Evaluate the user's answer to a flashcard question.
+                You are an expert grader. Evaluate my answer to a flashcard question.
                 
                 Question: %s
                 Expected Answer: %s
-                User's Answer: %s
+                My Answer: %s
                 
-                Grade the user's answer with:
+                Grade my answer with:
                 1. A numerical score from 1 to 10.
                 2. A categorical grade: exactly one of "CORRECT", "PARTIAL", or "INCORRECT".
-                3. A concise explanation focusing specifically on the difference between the user's answer and the expected answer.
+                3. A concise explanation focusing specifically on the difference between my answer and the expected answer. Speak directly to me (use "you" and "your").
                 
                 You MUST output ONLY a valid JSON object with exactly these three keys:
                 - "score": integer (1 to 10)
@@ -98,24 +106,30 @@ public class AIService {
                 """.formatted(sourceDescription, numCards, rawNotes);
     }
 
-    private JsonObject buildPayload(String promptText, String mimeType, String base64Data) {
+    // UPDATED: Now accepts a List of Base64 strings to support multiple PDFs
+    private JsonObject buildPayload(String promptText, String mimeType, List<String> base64Datas) {
         JsonObject payloadObj = new JsonObject();
         JsonArray contentsArray = new JsonArray();
         JsonObject contentObj = new JsonObject();
         contentObj.addProperty("role", "user");
         JsonArray partsArray = new JsonArray();
 
+        // 1. Add Text Part
         JsonObject textPart = new JsonObject();
         textPart.addProperty("text", promptText);
         partsArray.add(textPart);
 
-        if (mimeType != null && base64Data != null) {
-            JsonObject inlineData = new JsonObject();
-            inlineData.addProperty("mime_type", mimeType);
-            inlineData.addProperty("data", base64Data);
-            JsonObject dataPart = new JsonObject();
-            dataPart.add("inline_data", inlineData);
-            partsArray.add(dataPart);
+        // 2. Add Inline Data Parts (Loop through all PDFs if provided)
+        if (mimeType != null && base64Datas != null && !base64Datas.isEmpty()) {
+            for (String base64Data : base64Datas) {
+                JsonObject inlineData = new JsonObject();
+                inlineData.addProperty("mime_type", mimeType);
+                inlineData.addProperty("data", base64Data);
+                
+                JsonObject dataPart = new JsonObject();
+                dataPart.add("inline_data", inlineData);
+                partsArray.add(dataPart);
+            }
         }
 
         contentObj.add("parts", partsArray);
@@ -130,7 +144,6 @@ public class AIService {
         return payloadObj;
     }
 
-    // Refactored to return the raw JSON text so it can be parsed into different objects
     private String sendRequestAndGetText(JsonObject payloadObj, String apiKey) throws Exception {
         if (apiKey == null || apiKey.trim().isEmpty()) {
             throw new IllegalArgumentException("Google API Key cannot be empty.");
