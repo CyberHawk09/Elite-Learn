@@ -27,7 +27,6 @@ public class TestGenerator {
         try {
             // FIX: Use PDRectangle.A4 instead of PDPage.PAGE_SIZE_A4
             float pageWidth = PDRectangle.A4.getWidth();
-            float pageHeight = PDRectangle.A4.getHeight();
 
             int questionIndex = 0;
             int pageNum = 0;
