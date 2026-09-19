@@ -44,7 +44,7 @@ public class EliteLearnApp extends Application {
         
         Region glow1 = new Region();
         glow1.getStyleClass().add("glow-bg");
-        glow1.setPrefSize(1000, 1000); // Scaled up glows
+        glow1.setPrefSize(1000, 1000);
         glow1.setTranslateX(-400);
         glow1.setTranslateY(-400);
         
@@ -67,7 +67,7 @@ public class EliteLearnApp extends Application {
         
         Label loadingText = new Label("AI is processing...");
         loadingText.setTextFill(Color.WHITE);
-        loadingText.setFont(Font.font("Segoe UI", FontWeight.BOLD, 42)); // Scaled up
+        loadingText.setFont(Font.font("Segoe UI", FontWeight.BOLD, 42));
         
         VBox loadingBox = new VBox(30, spinner, loadingText);
         loadingBox.setAlignment(Pos.CENTER);
@@ -76,11 +76,24 @@ public class EliteLearnApp extends Application {
         rootPane.getChildren().addAll(glow1, glow2, contentPane, loadingOverlay);
         
         mainScene = new Scene(rootPane, 1920, 1080);
+        
+        // ==========================================
+        // NEW: Click outside notesArea to collapse it
+        // ==========================================
+        mainScene.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+            if (notesArea != null && notesArea.isVisible()) {
+                Point2D localPoint = notesArea.screenToLocal(event.getScreenX(), event.getScreenY());
+                if (!notesArea.contains(localPoint)) {
+                    collapseNotesArea();
+                }
+            }
+        });
+        
         primaryStage.setTitle("EliteLearn");
         primaryStage.setScene(mainScene);
         primaryStage.setMinWidth(1200);
         primaryStage.setMinHeight(800);
-        primaryStage.setMaximized(true); // Auto-maximize for 1080p fullscreen
+        primaryStage.setMaximized(true);
         primaryStage.show();
         
         showMainMenu();
@@ -106,7 +119,6 @@ public class EliteLearnApp extends Application {
         Button btn = new Button(text);
         btn.getStyleClass().add("glass-button");
         if (isRed) btn.getStyleClass().add("red");
-        // Massively scaled up for 1080p
         btn.setStyle(btn.getStyle() + "-fx-font-size: 34px; -fx-padding: 24 60 24 60;");
         
         btn.setOnMouseEntered(e -> {
@@ -124,7 +136,6 @@ public class EliteLearnApp extends Application {
         Button btn = new Button(text);
         btn.getStyleClass().add("glass-button");
         if (isRed) btn.getStyleClass().add("red");
-        // Scaled up for 1080p
         btn.setStyle(btn.getStyle() + "-fx-font-size: 24px; -fx-padding: 16 36 16 36;");
         return btn;
     }
@@ -137,15 +148,12 @@ public class EliteLearnApp extends Application {
         ft.play();
     }
 
-    // ==========================================
-    // Toast Popups: Larger text, constrained width, drop shadow
-    // ==========================================
     private void showToast(String message, boolean isError) {
         Label toastLabel = new Label(message);
         toastLabel.setTextFill(Color.WHITE);
-        toastLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 28)); // Huge text
+        toastLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 28));
         toastLabel.setPadding(new Insets(24, 48, 24, 48));
-        toastLabel.setMaxWidth(1000); // Takes up about half the 1920px screen
+        toastLabel.setMaxWidth(1000);
         toastLabel.setWrapText(true);
         toastLabel.setTextAlignment(TextAlignment.CENTER);
         
@@ -180,20 +188,19 @@ public class EliteLearnApp extends Application {
     }
 
     private void showMainMenu() {
-        // Using a VBox that fills the entire screen, with CENTER alignment to perfectly center the title/subtitle
         VBox mainContent = new VBox(60); 
-        mainContent.setAlignment(Pos.CENTER); // Centers children vertically and horizontally
+        mainContent.setAlignment(Pos.CENTER);
         mainContent.setPadding(new Insets(40));
-        mainContent.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE); // Forces VBox to fill the BorderPane center
+        mainContent.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         
         Label title = new Label("EliteLearn");
-        title.setFont(Font.font("Segoe UI", FontWeight.EXTRA_BOLD, 120)); // Massive title
+        title.setFont(Font.font("Segoe UI", FontWeight.EXTRA_BOLD, 120));
         title.setTextFill(Color.WHITE);
         title.setMaxWidth(Double.MAX_VALUE);
         title.setTextAlignment(TextAlignment.CENTER);
         
         Label subtitle = new Label("Leitner-inspired digital spaced learning system");
-        subtitle.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 40)); // Scaled up
+        subtitle.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 40));
         subtitle.setTextFill(Color.web("#828282"));
         subtitle.setMaxWidth(Double.MAX_VALUE);
         subtitle.setTextAlignment(TextAlignment.CENTER);
@@ -218,16 +225,16 @@ public class EliteLearnApp extends Application {
         screen.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         
         Label title = new Label("Create New Deck or Test");
-        title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 56)); // Scaled up
+        title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 56));
         title.setTextFill(Color.WHITE);
         
         HBox modeBox = new HBox(20);
         modeBox.setAlignment(Pos.CENTER_LEFT);
-        modeBox.setMaxWidth(1200); // Wider for 1080p
+        modeBox.setMaxWidth(1200);
         
         Label modeLabel = new Label("Create:");
         modeLabel.setTextFill(Color.web("#bbbbbb"));
-        modeLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 32)); // Scaled up
+        modeLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 32));
         
         ComboBox<String> modeDropdown = new ComboBox<>();
         modeDropdown.getItems().addAll("Flashcard Deck", "Test (PDF)");
@@ -245,7 +252,7 @@ public class EliteLearnApp extends Application {
         
         Label teacherLabel = new Label("Teacher Name:");
         teacherLabel.setTextFill(Color.web("#bbbbbb"));
-        teacherLabel.setFont(Font.font("Segoe UI", 32)); // Scaled up
+        teacherLabel.setFont(Font.font("Segoe UI", 32));
         
         TextField teacherField = new TextField();
         teacherField.setPrefWidth(500);
@@ -270,10 +277,6 @@ public class EliteLearnApp extends Application {
         notesArea.setManaged(false);
         notesArea.setMaxWidth(1200);
         notesArea.setStyle("-fx-background-color: #2b2b2b; -fx-control-inner-background: #2b2b2b; -fx-text-fill: #bbbbbb; -fx-border-color: #3574f0; -fx-border-radius: 8; -fx-background-radius: 8; -fx-font-size: 28px;");
-        
-        notesArea.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
-            if (!isNowFocused) collapseNotesArea();
-        });
         
         VBox notesContainer = new VBox(15, notesField, notesArea);
         notesContainer.setAlignment(Pos.TOP_CENTER);
@@ -309,7 +312,7 @@ public class EliteLearnApp extends Application {
         
         pdfStatusLabel = new Label("No PDFs selected");
         pdfStatusLabel.setTextFill(Color.web("#828282"));
-        pdfStatusLabel.setFont(Font.font("Segoe UI", 26)); // Scaled up
+        pdfStatusLabel.setFont(Font.font("Segoe UI", 26));
         pdfBox.getChildren().addAll(uploadPdfBtn, clearPdfBtn, pdfStatusLabel);
         
         HBox actionBox = new HBox(20);
@@ -353,7 +356,7 @@ public class EliteLearnApp extends Application {
     }
 
     private void collapseNotesArea() {
-        if (notesArea.isVisible()) {
+        if (notesArea != null && notesArea.isVisible()) {
             notesField.setText(notesArea.getText());
             notesArea.setVisible(false);
             notesArea.setManaged(false);
@@ -373,7 +376,7 @@ public class EliteLearnApp extends Application {
     }
 
     private void generateDeck() {
-        String notes = notesArea.isVisible() ? notesArea.getText() : notesField.getText();
+        String notes = notesArea != null && notesArea.isVisible() ? notesArea.getText() : (notesField != null ? notesField.getText() : "");
         if (selectedPdfs.isEmpty() && notes.trim().isEmpty()) {
             showToast("Please enter notes or upload a PDF first.", true);
             return;
@@ -413,7 +416,7 @@ public class EliteLearnApp extends Application {
     }
 
     private void generateTest(String teacherName) {
-        String notes = notesArea.isVisible() ? notesArea.getText() : notesField.getText();
+        String notes = notesArea != null && notesArea.isVisible() ? notesArea.getText() : (notesField != null ? notesField.getText() : "");
         if (selectedPdfs.isEmpty() && notes.trim().isEmpty()) {
             showToast("Please enter notes or upload a PDF first.", true);
             return;
@@ -506,13 +509,13 @@ public class EliteLearnApp extends Application {
         backBtn.setOnAction(e -> showMainMenu());
         
         Label title = new Label("Your Decks");
-        title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 56)); // Scaled up
+        title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 56));
         title.setTextFill(Color.WHITE);
         HBox.setHgrow(title, Priority.ALWAYS);
         topBar.getChildren().addAll(backBtn, title);
         
         deckListView = new ListView<>();
-        deckListView.setMaxWidth(1400); // Wider for 1080p
+        deckListView.setMaxWidth(1400);
         deckListView.setPrefWidth(1400);
         deckListView.setPrefHeight(800);
         deckListView.setStyle("-fx-background-color: transparent; -fx-control-inner-background: transparent;");
@@ -527,9 +530,6 @@ public class EliteLearnApp extends Application {
         deckListView.getItems().setAll(decks);
     }
 
-    // ==========================================
-    // Taller Decks, Right-Aligned Buttons, Fixed Drag/Drop
-    // ==========================================
     private class DeckListCell extends ListCell<Deck> {
         private final HBox content;
         private final Label nameLabel;
@@ -541,11 +541,10 @@ public class EliteLearnApp extends Application {
             content = new HBox(20);
             content.setAlignment(Pos.CENTER_LEFT);
             content.getStyleClass().add("deck-cell");
-            // Massive vertical padding for 1080p
             content.setPadding(new Insets(50, 40, 50, 40)); 
             
             nameLabel = new Label();
-            nameLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 38)); // Scaled up
+            nameLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 38));
             nameLabel.setTextFill(Color.web("#bbbbbb"));
             HBox.setHgrow(nameLabel, Priority.ALWAYS);
             
@@ -643,14 +642,14 @@ public class EliteLearnApp extends Application {
         topBar.getChildren().add(backBtn);
         
         Label questionLabel = new Label(currentStudyCard.getQuestion());
-        questionLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 72)); // Massive text
+        questionLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 72));
         questionLabel.setTextFill(Color.WHITE);
         questionLabel.setWrapText(true);
         questionLabel.setTextAlignment(TextAlignment.CENTER);
         questionLabel.setMaxWidth(1400);
         
         Label answerLabel = new Label(currentStudyCard.getAnswer());
-        answerLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 52)); // Scaled up
+        answerLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 52));
         answerLabel.setTextFill(Color.web("#5c94ff"));
         answerLabel.setWrapText(true);
         answerLabel.setTextAlignment(TextAlignment.CENTER);
@@ -663,13 +662,19 @@ public class EliteLearnApp extends Application {
         answerInputField.setStyle("-fx-background-color: #2b2b2b; -fx-text-fill: white; -fx-border-color: #3574f0; -fx-border-radius: 8; -fx-font-size: 32px; -fx-padding: 15;");
         
         Button submitAnswerBtn = createSmallGlassButton("Submit to AI", false);
-        HBox inputBox = new HBox(15, answerInputField, submitAnswerBtn);
+        
+        // ==========================================
+        // NEW: Cancel button for typing answer
+        // ==========================================
+        Button cancelAnswerBtn = createSmallGlassButton("Cancel", true);
+        
+        HBox inputBox = new HBox(15, answerInputField, submitAnswerBtn, cancelAnswerBtn);
         inputBox.setAlignment(Pos.CENTER);
         inputBox.setVisible(false);
         
         Label feedbackLabel = new Label();
         feedbackLabel.setWrapText(true);
-        feedbackLabel.setFont(Font.font("Segoe UI", 34)); // Scaled up
+        feedbackLabel.setFont(Font.font("Segoe UI", 34));
         feedbackLabel.setMaxWidth(1400);
         feedbackLabel.setTextAlignment(TextAlignment.CENTER);
         feedbackLabel.setVisible(false);
@@ -698,6 +703,17 @@ public class EliteLearnApp extends Application {
             typeAnswerBtn.setVisible(false);
             revealBtn.setVisible(false);
             skipBtn.setVisible(false);
+        });
+        
+        // ==========================================
+        // NEW: Cancel action logic
+        // ==========================================
+        cancelAnswerBtn.setOnAction(e -> {
+            inputBox.setVisible(false);
+            answerInputField.clear();
+            typeAnswerBtn.setVisible(true);
+            revealBtn.setVisible(true);
+            skipBtn.setVisible(true);
         });
         
         correctBtn.setVisible(false);
