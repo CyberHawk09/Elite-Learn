@@ -34,6 +34,7 @@ public class EliteLearnApp extends Application {
     
     private TextArea notesArea;
     private TextField notesField;
+    private TextField deckNameField; 
     private Label pdfStatusLabel;
     private ListView<Deck> deckListView;
 
@@ -77,9 +78,6 @@ public class EliteLearnApp extends Application {
         
         mainScene = new Scene(rootPane, 1920, 1080);
         
-        // ==========================================
-        // NEW: Click outside notesArea to collapse it
-        // ==========================================
         mainScene.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
             if (notesArea != null && notesArea.isVisible()) {
                 Point2D localPoint = notesArea.screenToLocal(event.getScreenX(), event.getScreenY());
@@ -148,74 +146,91 @@ public class EliteLearnApp extends Application {
         ft.play();
     }
 
-    private void showToast(String message, boolean isError) {
-        Label toastLabel = new Label(message);
-        toastLabel.setTextFill(Color.WHITE);
-        toastLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 28));
-        toastLabel.setPadding(new Insets(24, 48, 24, 48));
-        toastLabel.setMaxWidth(1000);
-        toastLabel.setWrapText(true);
-        toastLabel.setTextAlignment(TextAlignment.CENTER);
+    // ==========================================
+    // NEW: Small Grey Box Notification
+    // ==========================================
+    private void showMessage(String message) {
+        Label msgLabel = new Label(message);
+        msgLabel.setTextFill(Color.WHITE);
+        msgLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 16));
+        msgLabel.setPadding(new Insets(12, 24, 12, 24));
+        msgLabel.setMaxWidth(500); 
+        msgLabel.setWrapText(true);
+        msgLabel.setTextAlignment(TextAlignment.CENTER);
         
-        StackPane toastPane = new StackPane(toastLabel);
-        String bgColor = isError ? "#ff5555" : "#2ea043";
-        toastPane.setStyle("-fx-background-color: " + bgColor + "; -fx-background-radius: 16; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.6), 20, 0, 0, 8);");
+        StackPane msgPane = new StackPane(msgLabel);
+        // Dark grey background to make white text readable
+        msgPane.setStyle("-fx-background-color: #3a3a3a; -fx-background-radius: 8; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.6), 15, 0, 0, 5);");
         
-        rootPane.getChildren().add(toastPane);
-        StackPane.setAlignment(toastPane, Pos.BOTTOM_CENTER);
-        StackPane.setMargin(toastPane, new Insets(0, 0, 80, 0)); 
+        rootPane.getChildren().add(msgPane);
+        StackPane.setAlignment(msgPane, Pos.BOTTOM_CENTER);
+        StackPane.setMargin(msgPane, new Insets(0, 0, 50, 0)); 
         
-        toastPane.setOpacity(0);
-        toastPane.setTranslateY(40); 
+        msgPane.setOpacity(0);
+        msgPane.setTranslateY(20); 
         
-        FadeTransition fadeIn = new FadeTransition(Duration.millis(300), toastPane);
+        FadeTransition fadeIn = new FadeTransition(Duration.millis(300), msgPane);
         fadeIn.setToValue(1.0);
-        TranslateTransition slideIn = new TranslateTransition(Duration.millis(300), toastPane);
+        TranslateTransition slideIn = new TranslateTransition(Duration.millis(300), msgPane);
         slideIn.setToY(0);
         new ParallelTransition(fadeIn, slideIn).play();
         
-        PauseTransition delay = new PauseTransition(Duration.seconds(4));
+        PauseTransition delay = new PauseTransition(Duration.seconds(3.5));
         delay.setOnFinished(e -> {
-            FadeTransition fadeOut = new FadeTransition(Duration.millis(300), toastPane);
+            FadeTransition fadeOut = new FadeTransition(Duration.millis(300), msgPane);
             fadeOut.setToValue(0.0);
-            TranslateTransition slideOut = new TranslateTransition(Duration.millis(300), toastPane);
-            slideOut.setToY(40);
+            TranslateTransition slideOut = new TranslateTransition(Duration.millis(300), msgPane);
+            slideOut.setToY(20);
             ParallelTransition pt = new ParallelTransition(fadeOut, slideOut);
-            pt.setOnFinished(ev -> rootPane.getChildren().remove(toastPane));
+            pt.setOnFinished(ev -> rootPane.getChildren().remove(msgPane));
             pt.play();
         });
         delay.play();
     }
 
+    // ==========================================
+    // REDESIGNED: Perfectly Centered Main Menu
+    // ==========================================
     private void showMainMenu() {
-        VBox mainContent = new VBox(60); 
-        mainContent.setAlignment(Pos.CENTER);
-        mainContent.setPadding(new Insets(40));
-        mainContent.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        // Using a StackPane as the root ensures the VBox is perfectly centered 
+        // both horizontally and vertically within the BorderPane's center area.
+        StackPane centerContainer = new StackPane();
+        centerContainer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        
+        VBox menuBox = new VBox(50);
+        menuBox.setAlignment(Pos.CENTER);
         
         Label title = new Label("EliteLearn");
-        title.setFont(Font.font("Segoe UI", FontWeight.EXTRA_BOLD, 120));
+        title.setFont(Font.font("Segoe UI", FontWeight.EXTRA_BOLD, 110));
         title.setTextFill(Color.WHITE);
-        title.setMaxWidth(Double.MAX_VALUE);
         title.setTextAlignment(TextAlignment.CENTER);
         
         Label subtitle = new Label("Leitner-inspired digital spaced learning system");
-        subtitle.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 40));
+        subtitle.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 36));
         subtitle.setTextFill(Color.web("#828282"));
-        subtitle.setMaxWidth(Double.MAX_VALUE);
         subtitle.setTextAlignment(TextAlignment.CENTER);
         
         Button continueBtn = createGlassButton("Continue", false);
-        continueBtn.setOnAction(e -> showDecksScreen());
-        
         Button createBtn = createGlassButton("Create New", false);
-        createBtn.setOnAction(e -> showCreateScreen());
-        
         Button exitBtn = createGlassButton("Exit", true);
+        
+        // Uniform button width for a clean stacked look
+        double btnWidth = 450;
+        continueBtn.setPrefWidth(btnWidth);
+        createBtn.setPrefWidth(btnWidth);
+        exitBtn.setPrefWidth(btnWidth);
+        
+        continueBtn.setOnAction(e -> showDecksScreen());
+        createBtn.setOnAction(e -> showCreateScreen());
         exitBtn.setOnAction(e -> System.exit(0));
         
-        mainContent.getChildren().addAll(title, subtitle, continueBtn, createBtn, exitBtn);
-        contentPane.setCenter(mainContent);
+        VBox buttonStack = new VBox(20, continueBtn, createBtn, exitBtn);
+        buttonStack.setAlignment(Pos.CENTER);
+        
+        menuBox.getChildren().addAll(title, subtitle, buttonStack);
+        centerContainer.getChildren().add(menuBox);
+        
+        contentPane.setCenter(centerContainer);
     }
 
     private void showCreateScreen() {
@@ -227,6 +242,21 @@ public class EliteLearnApp extends Application {
         Label title = new Label("Create New Deck or Test");
         title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 56));
         title.setTextFill(Color.WHITE);
+        
+        HBox nameBox = new HBox(20);
+        nameBox.setAlignment(Pos.CENTER_LEFT);
+        nameBox.setMaxWidth(1200);
+        
+        Label nameLabel = new Label("Title:");
+        nameLabel.setTextFill(Color.web("#bbbbbb"));
+        nameLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 32));
+        
+        deckNameField = new TextField();
+        deckNameField.setPromptText("Enter Deck or Test Name...");
+        deckNameField.setPrefWidth(600);
+        deckNameField.setStyle("-fx-background-color: #2b2b2b; -fx-text-fill: #bbbbbb; -fx-border-color: #3c3f41; -fx-border-radius: 8; -fx-background-radius: 8; -fx-font-size: 28px; -fx-padding: 10;");
+        
+        nameBox.getChildren().addAll(nameLabel, deckNameField);
         
         HBox modeBox = new HBox(20);
         modeBox.setAlignment(Pos.CENTER_LEFT);
@@ -335,7 +365,8 @@ public class EliteLearnApp extends Application {
         });
         
         actionBox.getChildren().addAll(importBtn, cancelBtn, generateBtn);
-        screen.getChildren().addAll(title, modeBox, testOptionsPanel, notesContainer, pdfBox, actionBox);
+        
+        screen.getChildren().addAll(title, nameBox, modeBox, testOptionsPanel, notesContainer, pdfBox, actionBox);
         contentPane.setCenter(screen);
     }
 
@@ -376,11 +407,18 @@ public class EliteLearnApp extends Application {
     }
 
     private void generateDeck() {
-        String notes = notesArea != null && notesArea.isVisible() ? notesArea.getText() : (notesField != null ? notesField.getText() : "");
-        if (selectedPdfs.isEmpty() && notes.trim().isEmpty()) {
-            showToast("Please enter notes or upload a PDF first.", true);
+        String deckName = deckNameField.getText().trim();
+        if (deckName.isEmpty()) {
+            showMessage("Please enter a title for your deck.");
             return;
         }
+
+        String notes = notesArea != null && notesArea.isVisible() ? notesArea.getText() : (notesField != null ? notesField.getText() : "");
+        if (selectedPdfs.isEmpty() && notes.trim().isEmpty()) {
+            showMessage("Please enter notes or upload a PDF first.");
+            return;
+        }
+        
         showLoading(true);
         Task<List<Flashcard>> task = new Task<>() {
             @Override
@@ -393,34 +431,37 @@ public class EliteLearnApp extends Application {
                 }
             }
         };
+        
         task.setOnSucceeded(e -> {
             showLoading(false);
             List<Flashcard> cards = task.getValue();
-            TextInputDialog dialog = new TextInputDialog();
-            dialog.setTitle("Name Your Deck");
-            dialog.setHeaderText("Enter a name for your new deck:");
-            dialog.showAndWait().ifPresent(name -> {
-                if (!name.trim().isEmpty()) {
-                    decks.add(new Deck(name.trim(), cards));
-                    showDecksScreen();
-                }
-            });
+            decks.add(new Deck(deckName, cards));
+            showMessage("Deck '" + deckName + "' created successfully!");
+            showDecksScreen();
         });
+        
         task.setOnFailed(e -> {
             showLoading(false);
             String errorMsg = task.getException().getMessage();
             if (errorMsg.contains("503")) errorMsg = "AI Service is temporarily busy (503). Please try again in a few seconds.";
-            showToast(errorMsg, true);
+            showMessage(errorMsg);
         });
         new Thread(task).start();
     }
 
     private void generateTest(String teacherName) {
-        String notes = notesArea != null && notesArea.isVisible() ? notesArea.getText() : (notesField != null ? notesField.getText() : "");
-        if (selectedPdfs.isEmpty() && notes.trim().isEmpty()) {
-            showToast("Please enter notes or upload a PDF first.", true);
+        String testName = deckNameField.getText().trim();
+        if (testName.isEmpty()) {
+            showMessage("Please enter a title for your test.");
             return;
         }
+
+        String notes = notesArea != null && notesArea.isVisible() ? notesArea.getText() : (notesField != null ? notesField.getText() : "");
+        if (selectedPdfs.isEmpty() && notes.trim().isEmpty()) {
+            showMessage("Please enter notes or upload a PDF first.");
+            return;
+        }
+        
         showLoading(true);
         Task<List<Flashcard>> task = new Task<>() {
             @Override
@@ -433,45 +474,44 @@ public class EliteLearnApp extends Application {
                 }
             }
         };
+        
         task.setOnSucceeded(e -> {
             showLoading(false);
             List<Flashcard> questions = task.getValue();
-            TextInputDialog dialog = new TextInputDialog();
-            dialog.setTitle("Name Your Test");
-            dialog.setHeaderText("Enter a name for your test:");
-            dialog.showAndWait().ifPresent(testName -> {
-                if (!testName.trim().isEmpty()) {
-                    FileChooser testFC = new FileChooser();
-                    testFC.setInitialFileName(testName + "_Test.pdf");
-                    testFC.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF Files", "*.pdf"));
-                    File testFile = testFC.showSaveDialog(null);
-                    if (testFile != null) {
-                        try {
-                            if (!testFile.getName().toLowerCase().endsWith(".pdf")) {
-                                testFile = new File(testFile.getAbsolutePath() + ".pdf");
-                            }
-                            TestGenerator.generateTestPDF(testName, teacherName, questions, testFile);
-                            FileChooser keyFC = new FileChooser();
-                            keyFC.setInitialFileName(testName + "_AnswerKey.pdf");
-                            keyFC.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF Files", "*.pdf"));
-                            File keyFile = keyFC.showSaveDialog(null);
-                            if (keyFile != null) {
-                                if (!keyFile.getName().toLowerCase().endsWith(".pdf")) {
-                                    keyFile = new File(keyFile.getAbsolutePath() + ".pdf");
-                                }
-                                TestGenerator.generateAnswerKeyPDF(testName, teacherName, questions, keyFile);
-                                showToast("Test and Answer Key generated!", false);
-                            }
-                        } catch (Exception ex) {
-                            showToast("Error generating test: " + ex.getMessage(), true);
-                        }
+            
+            FileChooser testFC = new FileChooser();
+            testFC.setInitialFileName(testName + "_Test.pdf");
+            testFC.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF Files", "*.pdf"));
+            File testFile = testFC.showSaveDialog(null);
+            
+            if (testFile != null) {
+                try {
+                    if (!testFile.getName().toLowerCase().endsWith(".pdf")) {
+                        testFile = new File(testFile.getAbsolutePath() + ".pdf");
                     }
+                    TestGenerator.generateTestPDF(testName, teacherName, questions, testFile);
+                    
+                    FileChooser keyFC = new FileChooser();
+                    keyFC.setInitialFileName(testName + "_AnswerKey.pdf");
+                    keyFC.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF Files", "*.pdf"));
+                    File keyFile = keyFC.showSaveDialog(null);
+                    
+                    if (keyFile != null) {
+                        if (!keyFile.getName().toLowerCase().endsWith(".pdf")) {
+                            keyFile = new File(keyFile.getAbsolutePath() + ".pdf");
+                        }
+                        TestGenerator.generateAnswerKeyPDF(testName, teacherName, questions, keyFile);
+                        showMessage("Test and Answer Key generated!");
+                    }
+                } catch (Exception ex) {
+                    showMessage("Error generating test: " + ex.getMessage());
                 }
-            });
+            }
         });
+        
         task.setOnFailed(e -> {
             showLoading(false);
-            showToast("Error: " + task.getException().getMessage(), true);
+            showMessage("Error: " + task.getException().getMessage());
         });
         new Thread(task).start();
     }
@@ -486,11 +526,11 @@ public class EliteLearnApp extends Application {
                 Deck importedDeck = new com.google.gson.Gson().fromJson(json, Deck.class);
                 if (importedDeck != null && importedDeck.getName() != null) {
                     decks.add(importedDeck);
-                    showToast("Deck '" + importedDeck.getName() + "' imported!", false);
+                    showMessage("Deck '" + importedDeck.getName() + "' imported!");
                     showDecksScreen();
                 }
             } catch (Exception e) {
-                showToast("Error importing deck: " + e.getMessage(), true);
+                showMessage("Error importing deck: " + e.getMessage());
             }
         }
     }
@@ -613,7 +653,7 @@ public class EliteLearnApp extends Application {
 
     private void startStudySession(Deck deck) {
         if (deck.isEmpty()) {
-            showToast("This deck is empty!", true);
+            showMessage("This deck is empty!");
             return;
         }
         currentStudyDeck = deck;
@@ -623,7 +663,7 @@ public class EliteLearnApp extends Application {
     private void loadNextCard() {
         currentStudyCard = currentStudyDeck.pickNextCard();
         if (currentStudyCard == null) {
-            showToast("Deck is empty!", true);
+            showMessage("Deck is empty!");
             showDecksScreen();
             return;
         }
@@ -642,14 +682,14 @@ public class EliteLearnApp extends Application {
         topBar.getChildren().add(backBtn);
         
         Label questionLabel = new Label(currentStudyCard.getQuestion());
-        questionLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 72));
+        questionLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 42)); 
         questionLabel.setTextFill(Color.WHITE);
         questionLabel.setWrapText(true);
         questionLabel.setTextAlignment(TextAlignment.CENTER);
         questionLabel.setMaxWidth(1400);
         
         Label answerLabel = new Label(currentStudyCard.getAnswer());
-        answerLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 52));
+        answerLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 32)); 
         answerLabel.setTextFill(Color.web("#5c94ff"));
         answerLabel.setWrapText(true);
         answerLabel.setTextAlignment(TextAlignment.CENTER);
@@ -662,10 +702,6 @@ public class EliteLearnApp extends Application {
         answerInputField.setStyle("-fx-background-color: #2b2b2b; -fx-text-fill: white; -fx-border-color: #3574f0; -fx-border-radius: 8; -fx-font-size: 32px; -fx-padding: 15;");
         
         Button submitAnswerBtn = createSmallGlassButton("Submit to AI", false);
-        
-        // ==========================================
-        // NEW: Cancel button for typing answer
-        // ==========================================
         Button cancelAnswerBtn = createSmallGlassButton("Cancel", true);
         
         HBox inputBox = new HBox(15, answerInputField, submitAnswerBtn, cancelAnswerBtn);
@@ -705,9 +741,6 @@ public class EliteLearnApp extends Application {
             skipBtn.setVisible(false);
         });
         
-        // ==========================================
-        // NEW: Cancel action logic
-        // ==========================================
         cancelAnswerBtn.setOnAction(e -> {
             inputBox.setVisible(false);
             answerInputField.clear();
@@ -746,7 +779,7 @@ public class EliteLearnApp extends Application {
             gradeTask.setOnSucceeded(ev -> {
                 showLoading(false);
                 AIService.GradeResult res = gradeTask.getValue();
-                feedbackLabel.setText("Score: " + res.score + "/10 | Grade: " + res.grade + "\n\nCorrect Answer:\n" + currentStudyCard.getAnswer() + "\n\nAI Feedback:\n" + res.explanation);
+                feedbackLabel.setText("Score: " + res.score + "/10 | Grade: " + res.grade + "\n\nCorrect Answer:\n" + currentStudyCard.getAnswer() + "\nAI Feedback:\n" + res.explanation);
                 if (res.score >= 9) feedbackLabel.setTextFill(Color.web("#2ea043"));
                 else if (res.score <= 7) feedbackLabel.setTextFill(Color.web("#ff5555"));
                 else feedbackLabel.setTextFill(Color.web("#f0b432"));
@@ -760,7 +793,7 @@ public class EliteLearnApp extends Application {
             });
             gradeTask.setOnFailed(ev -> {
                 showLoading(false);
-                showToast("Error grading: " + gradeTask.getException().getMessage(), true);
+                showMessage("Error grading: " + gradeTask.getException().getMessage());
             });
             new Thread(gradeTask).start();
         });
@@ -779,9 +812,9 @@ public class EliteLearnApp extends Application {
         if (file != null) {
             try {
                 java.nio.file.Files.writeString(file.toPath(), new com.google.gson.Gson().toJson(deck));
-                showToast("Deck exported successfully!", false);
+                showMessage("Deck exported successfully!");
             } catch (Exception e) {
-                showToast("Error exporting: " + e.getMessage(), true);
+                showMessage("Error exporting: " + e.getMessage());
             }
         }
     }
