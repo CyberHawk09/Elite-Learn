@@ -20,7 +20,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-public class EliteLearnApp extends Application {
+public class EliteLearnAppC extends Application {
     private final List<Deck> decks = new ArrayList<>();
     private final AIService aiService = new AIService();
     private Deck currentStudyDeck;
