@@ -2,10 +2,13 @@ package com.elitelearn;
 
 import javafx.animation.*;
 import javafx.application.Application;
+import javafx.event.ActionEvent; // <--- ADD THIS LINE
 import javafx.geometry.*;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.*;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -32,6 +35,8 @@ public class EliteLearnApp extends Application {
     private StackPane loadingOverlay;
     private StackPane statusOverlay;
     private Label statusLabel;
+    private MediaPlayer backgroundMusicPlayer;
+    private MediaPlayer clickSoundPlayer;
 
     private Scene mainScene;
 
@@ -45,6 +50,8 @@ public class EliteLearnApp extends Application {
     public void start(Stage primaryStage) {
         rootPane = new StackPane();
         rootPane.getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
+
+        initializeAudio();
 
         Region glow1 = new Region();
         glow1.getStyleClass().add("glow-bg");
@@ -144,11 +151,39 @@ public class EliteLearnApp extends Application {
         });
     }
 
+    private void initializeAudio() {
+        try {
+            var musicUrl = getClass().getResource("/audio/calm-background.mp3");
+            var clickUrl = getClass().getResource("/audio/bubble-click.mp3");
+            if (musicUrl != null) {
+                backgroundMusicPlayer = new MediaPlayer(new Media(musicUrl.toExternalForm()));
+                backgroundMusicPlayer.setCycleCount(MediaPlayer.INDEFINITE);
+                backgroundMusicPlayer.setVolume(0.18);
+                backgroundMusicPlayer.play();
+            }
+            if (clickUrl != null) {
+                clickSoundPlayer = new MediaPlayer(new Media(clickUrl.toExternalForm()));
+                clickSoundPlayer.setVolume(0.35);
+            }
+        } catch (Exception ex) {
+            System.err.println("Could not initialize audio: " + ex.getMessage());
+        }
+    }
+
+    private void playClickSound() {
+        if (clickSoundPlayer == null) return;
+        clickSoundPlayer.stop();
+        clickSoundPlayer.seek(Duration.ZERO);
+        clickSoundPlayer.play();
+    }
+
     private Button createGlassButton(String text, boolean isRed) {
         Button btn = new Button(text);
         btn.getStyleClass().add("glass-button");
         if (isRed) btn.getStyleClass().add("red");
         btn.setStyle(btn.getStyle() + "-fx-font-size: 34px; -fx-padding: 24 60 24 60;");
+
+        btn.addEventFilter(ActionEvent.ACTION, e -> playClickSound());
 
         btn.setOnMouseEntered(e -> {
             ScaleTransition st = new ScaleTransition(Duration.millis(200), btn);
@@ -166,6 +201,7 @@ public class EliteLearnApp extends Application {
         btn.getStyleClass().add("glass-button");
         if (isRed) btn.getStyleClass().add("red");
         btn.setStyle(btn.getStyle() + "-fx-font-size: 24px; -fx-padding: 16 36 16 36;");
+        btn.addEventFilter(ActionEvent.ACTION, e -> playClickSound());
         return btn;
     }
 
@@ -791,6 +827,8 @@ public class EliteLearnApp extends Application {
         // ==========================================
         ScrollPane feedbackScroll = createTransparentScrollableLabel("", Color.WHITE, 32, 350);
         feedbackScroll.setVisible(false);
+        // Move AI feedback upward so it occupies the same visual position as the regular answer.
+        VBox.setMargin(feedbackScroll, new Insets(-40, 0, 0, 0));
 
         HBox buttonBox = new HBox(20);
         buttonBox.setAlignment(Pos.CENTER);
@@ -898,6 +936,12 @@ public class EliteLearnApp extends Application {
                 showStatus("Error exporting: " + e.getMessage(), true);
             }
         }
+    }
+
+    @Override
+    public void stop() {
+        if (backgroundMusicPlayer != null) backgroundMusicPlayer.stop();
+        if (clickSoundPlayer != null) clickSoundPlayer.stop();
     }
 
     public static void main(String[] args) {

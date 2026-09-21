@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Launcher",
+            "request": "launch",
+            "mainClass": "com.elitelearn.Launcher",
+            "projectName": "elitelearn"
+        },
+        {
+            "type": "java",
+            "name": "Launch EliteLearnApp",
+            "request": "launch",
+            "mainClass": "com.elitelearn.EliteLearnApp",
+            "vmArgs": "--add-modules javafx.controls,javafx.fxml,javafx.media"
+        }
+    ]
+}
