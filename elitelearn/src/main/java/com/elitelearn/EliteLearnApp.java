@@ -2,7 +2,7 @@ package com.elitelearn;
 
 import javafx.animation.*;
 import javafx.application.Application;
-import javafx.event.ActionEvent; // <--- ADD THIS LINE
+import javafx.event.ActionEvent;
 import javafx.geometry.*;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -29,76 +29,80 @@ public class EliteLearnApp extends Application {
     private Deck currentStudyDeck;
     private Flashcard currentStudyCard;
     private final List<File> selectedPdfs = new ArrayList<>();
-
+    
     private StackPane rootPane;
-    private BorderPane contentPane;
+    private BorderPane contentPane; 
     private StackPane loadingOverlay;
     private StackPane statusOverlay;
     private Label statusLabel;
+    
     private MediaPlayer backgroundMusicPlayer;
     private MediaPlayer clickSoundPlayer;
-
+    
     private Scene mainScene;
-
+    
     private TextArea notesArea;
     private TextField notesField;
-    private TextField deckNameField;
+    private TextField deckNameField; 
     private Label pdfStatusLabel;
     private ListView<Deck> deckListView;
+
+    // ==========================================
+    // FEYNMAN MODE STATE
+    // ==========================================
+    private String feynmanConcept;
+    private String feynmanPersona;
+    private String feynmanCurrentQuestion;
+    private String feynmanContext;
+    private int feynmanTurn = 1;
+    private static final int MAX_FEYNMAN_TURNS = 3;
 
     @Override
     public void start(Stage primaryStage) {
         rootPane = new StackPane();
         rootPane.getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
-
         initializeAudio();
-
+        
         Region glow1 = new Region();
         glow1.getStyleClass().add("glow-bg");
         glow1.setPrefSize(1000, 1000);
         glow1.setTranslateX(-400);
         glow1.setTranslateY(-400);
-
+        
         Region glow2 = new Region();
         glow2.getStyleClass().add("glow-bg");
         glow2.setPrefSize(900, 900);
         glow2.setTranslateX(500);
         glow2.setTranslateY(400);
-
+        
         contentPane = new BorderPane();
         contentPane.setStyle("-fx-background-color: transparent;");
-
-        // Loading Overlay
+        
         loadingOverlay = new StackPane();
         loadingOverlay.getStyleClass().add("loading-overlay");
         loadingOverlay.setVisible(false);
         loadingOverlay.setOpacity(0);
-
+        
         ProgressIndicator spinner = new ProgressIndicator();
         spinner.setStyle("-fx-accent: #3574f0; -fx-min-width: 100; -fx-min-height: 100;");
-
+        
         Label loadingText = new Label("AI is processing...");
         loadingText.setTextFill(Color.WHITE);
         loadingText.setFont(Font.font("Segoe UI", FontWeight.BOLD, 42));
-
+        
         VBox loadingBox = new VBox(30, spinner, loadingText);
         loadingBox.setAlignment(Pos.CENTER);
         loadingOverlay.getChildren().add(loadingBox);
-
-        // ==========================================
-        // Full-Screen Status Overlay (Centered)
-        // ==========================================
+        
         statusOverlay = new StackPane();
         statusOverlay.setStyle("-fx-background-color: rgba(15, 15, 15, 0.92);");
         statusOverlay.setVisible(false);
         statusOverlay.setOpacity(0);
-
-        // Fill the entire window, regardless of the current/maximized window size.
         statusOverlay.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         statusOverlay.setAlignment(Pos.CENTER);
         statusOverlay.prefWidthProperty().bind(rootPane.widthProperty());
         statusOverlay.prefHeightProperty().bind(rootPane.heightProperty());
-
+        
         statusLabel = new Label();
         statusLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 48));
         statusLabel.setTextAlignment(TextAlignment.CENTER);
@@ -106,16 +110,14 @@ public class EliteLearnApp extends Application {
         statusLabel.setMaxWidth(1400);
         statusLabel.setMaxHeight(Double.MAX_VALUE);
         statusLabel.setAlignment(Pos.CENTER);
-
-        // Explicitly center the notification in the full-screen overlay.
         StackPane.setAlignment(statusLabel, Pos.CENTER);
-
+        
         statusOverlay.getChildren().setAll(statusLabel);
-
+        
         rootPane.getChildren().addAll(glow1, glow2, contentPane, loadingOverlay, statusOverlay);
-
+        
         mainScene = new Scene(rootPane, 1920, 1080);
-
+        
         mainScene.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
             if (notesArea != null && notesArea.isVisible()) {
                 Point2D localPoint = notesArea.screenToLocal(event.getScreenX(), event.getScreenY());
@@ -124,16 +126,16 @@ public class EliteLearnApp extends Application {
                 }
             }
         });
-
+        
         primaryStage.setTitle("EliteLearn");
         primaryStage.setScene(mainScene);
         primaryStage.setMinWidth(1200);
         primaryStage.setMinHeight(800);
         primaryStage.setMaximized(true);
         primaryStage.show();
-
+        
         showMainMenu();
-
+        
         if (ApiKeyManager.getApiKey() == null) {
             promptForApiKey();
         }
@@ -182,9 +184,8 @@ public class EliteLearnApp extends Application {
         btn.getStyleClass().add("glass-button");
         if (isRed) btn.getStyleClass().add("red");
         btn.setStyle(btn.getStyle() + "-fx-font-size: 34px; -fx-padding: 24 60 24 60;");
-
         btn.addEventFilter(ActionEvent.ACTION, e -> playClickSound());
-
+        
         btn.setOnMouseEntered(e -> {
             ScaleTransition st = new ScaleTransition(Duration.millis(200), btn);
             st.setToX(1.05); st.setToY(1.05); st.play();
@@ -213,18 +214,15 @@ public class EliteLearnApp extends Application {
         ft.play();
     }
 
-    // ==========================================
-    // Full-Screen Centered Status Message
-    // ==========================================
     private void showStatus(String message, boolean isError) {
         statusLabel.setText(message);
         statusLabel.setTextFill(isError ? Color.web("#ff5555") : Color.web("#2ea043"));
-
+        
         statusOverlay.setVisible(true);
         FadeTransition ftIn = new FadeTransition(Duration.millis(300), statusOverlay);
         ftIn.setToValue(1.0);
         ftIn.play();
-
+        
         PauseTransition delay = new PauseTransition(Duration.seconds(2.5));
         delay.setOnFinished(e -> {
             FadeTransition ftOut = new FadeTransition(Duration.millis(300), statusOverlay);
@@ -235,9 +233,6 @@ public class EliteLearnApp extends Application {
         delay.play();
     }
 
-    // ==========================================
-    // Transparent Scrollable Feedback Box
-    // ==========================================
     private ScrollPane createTransparentScrollableLabel(String text, Color textColor, double fontSize, double maxHeight) {
         Label label = new Label(text);
         label.setWrapText(true);
@@ -246,7 +241,7 @@ public class EliteLearnApp extends Application {
         label.setTextAlignment(TextAlignment.CENTER);
         label.setMaxWidth(Double.MAX_VALUE);
         label.setPadding(new Insets(15));
-
+        
         ScrollPane scrollPane = new ScrollPane(label);
         scrollPane.setFitToWidth(true);
         scrollPane.setFitToHeight(false);
@@ -255,57 +250,56 @@ public class EliteLearnApp extends Application {
         scrollPane.setPrefHeight(Region.USE_COMPUTED_SIZE);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-
-        // Fully transparent background
+        
         scrollPane.setStyle(
             "-fx-background-color: transparent; " +
             "-fx-background: transparent; " +
             "-fx-border-color: transparent;"
         );
-        // Also make the viewport transparent
+        
         scrollPane.lookupAll(".viewport").forEach(node ->
             node.setStyle("-fx-background-color: transparent;")
         );
-
+        
         return scrollPane;
     }
 
     private void showMainMenu() {
         StackPane centerContainer = new StackPane();
         centerContainer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-
+        
         VBox menuBox = new VBox(50);
         menuBox.setAlignment(Pos.CENTER);
-
+        
         Label title = new Label("EliteLearn");
         title.setFont(Font.font("Segoe UI", FontWeight.EXTRA_BOLD, 110));
         title.setTextFill(Color.WHITE);
         title.setTextAlignment(TextAlignment.CENTER);
-
+        
         Label subtitle = new Label("Leitner-inspired digital spaced learning system");
         subtitle.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 36));
         subtitle.setTextFill(Color.web("#828282"));
         subtitle.setTextAlignment(TextAlignment.CENTER);
-
+        
         Button continueBtn = createGlassButton("Continue", false);
         Button createBtn = createGlassButton("Create New", false);
         Button exitBtn = createGlassButton("Exit", true);
-
+        
         double btnWidth = 450;
         continueBtn.setPrefWidth(btnWidth);
         createBtn.setPrefWidth(btnWidth);
         exitBtn.setPrefWidth(btnWidth);
-
+        
         continueBtn.setOnAction(e -> showDecksScreen());
         createBtn.setOnAction(e -> showCreateScreen());
         exitBtn.setOnAction(e -> System.exit(0));
-
+        
         VBox buttonStack = new VBox(20, continueBtn, createBtn, exitBtn);
         buttonStack.setAlignment(Pos.CENTER);
-
+        
         menuBox.getChildren().addAll(title, subtitle, buttonStack);
         centerContainer.getChildren().add(menuBox);
-
+        
         contentPane.setCenter(centerContainer);
     }
 
@@ -314,40 +308,39 @@ public class EliteLearnApp extends Application {
         screen.setPadding(new Insets(60));
         screen.setAlignment(Pos.TOP_CENTER);
         screen.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-
-        Label title = new Label("Create New Deck or Test");
+        
+        Label title = new Label("Create New Deck, Test, or Feynman Session");
         title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 56));
         title.setTextFill(Color.WHITE);
-
+        
         HBox nameBox = new HBox(20);
         nameBox.setAlignment(Pos.CENTER_LEFT);
         nameBox.setMaxWidth(1200);
-
+        
         Label nameLabel = new Label("Title:");
         nameLabel.setTextFill(Color.web("#bbbbbb"));
         nameLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 32));
-
+        
         deckNameField = new TextField();
-        deckNameField.setPromptText("Enter Deck or Test Name...");
+        deckNameField.setPromptText("Enter Session Name (Optional for Feynman)...");
         deckNameField.setPrefWidth(600);
         deckNameField.setStyle("-fx-background-color: #2b2b2b; -fx-text-fill: #bbbbbb; -fx-border-color: #3c3f41; -fx-border-radius: 8; -fx-background-radius: 8; -fx-font-size: 28px; -fx-padding: 10;");
-
+        
         nameBox.getChildren().addAll(nameLabel, deckNameField);
-
+        
         HBox modeBox = new HBox(20);
         modeBox.setAlignment(Pos.CENTER_LEFT);
         modeBox.setMaxWidth(1200);
-
-        Label modeLabel = new Label("Create:");
+        
+        Label modeLabel = new Label("Mode:");
         modeLabel.setTextFill(Color.web("#bbbbbb"));
         modeLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 32));
-
+        
         ComboBox<String> modeDropdown = new ComboBox<>();
-        modeDropdown.getItems().addAll("Flashcard Deck", "Test (PDF)");
+        modeDropdown.getItems().addAll("Flashcard Deck", "Test (PDF)", "Feynman Mode 🧠");
         modeDropdown.setValue("Flashcard Deck");
         modeDropdown.setStyle("-fx-font-size: 28px; -fx-background-color: #2b2b2b; -fx-padding: 5;");
-
-        // Keep the selected value visible in the closed ComboBox.
+        
         ListCell<String> buttonCell = new ListCell<>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -359,8 +352,7 @@ public class EliteLearnApp extends Application {
             }
         };
         modeDropdown.setButtonCell(buttonCell);
-
-        // Make the items in the opened dropdown clearly visible as well.
+        
         modeDropdown.setCellFactory(list -> new ListCell<>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -371,57 +363,58 @@ public class EliteLearnApp extends Application {
                 setStyle("-fx-background-color: #2b2b2b; -fx-text-fill: white;");
             }
         });
+        
         modeBox.getChildren().addAll(modeLabel, modeDropdown);
-
+        
         VBox testOptionsPanel = new VBox(15);
         testOptionsPanel.setMaxWidth(1200);
         testOptionsPanel.setVisible(false);
         testOptionsPanel.setManaged(false);
-
+        
         HBox teacherBox = new HBox(20);
         teacherBox.setAlignment(Pos.CENTER_LEFT);
-
+        
         Label teacherLabel = new Label("Teacher Name:");
         teacherLabel.setTextFill(Color.web("#bbbbbb"));
         teacherLabel.setFont(Font.font("Segoe UI", 32));
-
+        
         TextField teacherField = new TextField();
         teacherField.setPrefWidth(500);
         teacherField.setStyle("-fx-background-color: #2b2b2b; -fx-text-fill: #bbbbbb; -fx-border-color: #3c3f41; -fx-border-radius: 8; -fx-background-radius: 8; -fx-font-size: 28px; -fx-padding: 10;");
         teacherBox.getChildren().addAll(teacherLabel, teacherField);
         testOptionsPanel.getChildren().add(teacherBox);
-
+        
         modeDropdown.setOnAction(e -> {
             boolean isTest = "Test (PDF)".equals(modeDropdown.getValue());
             testOptionsPanel.setVisible(isTest);
             testOptionsPanel.setManaged(isTest);
         });
-
+        
         notesField = new TextField();
         notesField.setPromptText("Click here to start typing or pasting notes...");
         notesField.setMaxWidth(1200);
         notesField.setStyle("-fx-background-color: #2b2b2b; -fx-text-fill: #bbbbbb; -fx-border-color: #3c3f41; -fx-border-radius: 8; -fx-background-radius: 8; -fx-font-size: 28px; -fx-padding: 16;");
-
+        
         notesArea = new TextArea();
         notesArea.setWrapText(true);
         notesArea.setVisible(false);
         notesArea.setManaged(false);
         notesArea.setMaxWidth(1200);
         notesArea.setStyle("-fx-background-color: #2b2b2b; -fx-control-inner-background: #2b2b2b; -fx-text-fill: #bbbbbb; -fx-border-color: #3574f0; -fx-border-radius: 8; -fx-background-radius: 8; -fx-font-size: 28px;");
-
+        
         VBox notesContainer = new VBox(15, notesField, notesArea);
         notesContainer.setAlignment(Pos.TOP_CENTER);
         notesContainer.setMaxWidth(1200);
-
+        
         notesField.setOnMouseClicked(e -> expandNotesArea());
         notesField.textProperty().addListener((obs, old, newVal) -> {
             if (!newVal.isEmpty()) expandNotesArea();
         });
-
+        
         HBox pdfBox = new HBox(20);
         pdfBox.setAlignment(Pos.CENTER_LEFT);
         pdfBox.setMaxWidth(1200);
-
+        
         Button uploadPdfBtn = createSmallGlassButton("Upload PDF(s)", false);
         uploadPdfBtn.setOnAction(e -> {
             FileChooser fc = new FileChooser();
@@ -434,39 +427,42 @@ public class EliteLearnApp extends Application {
                 notesField.clear();
             }
         });
-
+        
         Button clearPdfBtn = createSmallGlassButton("Clear PDFs", true);
         clearPdfBtn.setOnAction(e -> {
             selectedPdfs.clear();
             updatePdfStatus();
         });
-
+        
         pdfStatusLabel = new Label("No PDFs selected");
         pdfStatusLabel.setTextFill(Color.web("#828282"));
         pdfStatusLabel.setFont(Font.font("Segoe UI", 26));
         pdfBox.getChildren().addAll(uploadPdfBtn, clearPdfBtn, pdfStatusLabel);
-
+        
         HBox actionBox = new HBox(20);
         actionBox.setAlignment(Pos.CENTER);
         actionBox.setMaxWidth(1200);
-
+        
         Button importBtn = createGlassButton("Import Deck JSON", false);
         importBtn.setOnAction(e -> importDeck());
-
+        
         Button cancelBtn = createGlassButton("Cancel", false);
         cancelBtn.setOnAction(e -> showMainMenu());
-
-        Button generateBtn = createGlassButton("Generate", false);
+        
+        Button generateBtn = createGlassButton("Start Session", false);
         generateBtn.setOnAction(e -> {
-            if ("Test (PDF)".equals(modeDropdown.getValue())) {
+            String mode = modeDropdown.getValue();
+            if ("Test (PDF)".equals(mode)) {
                 generateTest(teacherField.getText());
+            } else if ("Feynman Mode 🧠".equals(mode)) {
+                startFeynmanSession();
             } else {
                 generateDeck();
             }
         });
-
+        
         actionBox.getChildren().addAll(importBtn, cancelBtn, generateBtn);
-
+        
         screen.getChildren().addAll(title, nameBox, modeBox, testOptionsPanel, notesContainer, pdfBox, actionBox);
         contentPane.setCenter(screen);
     }
@@ -519,7 +515,7 @@ public class EliteLearnApp extends Application {
             showStatus("Please enter notes or upload a PDF first.", true);
             return;
         }
-
+        
         showLoading(true);
         Task<List<Flashcard>> task = new Task<>() {
             @Override
@@ -532,7 +528,7 @@ public class EliteLearnApp extends Application {
                 }
             }
         };
-
+        
         task.setOnSucceeded(e -> {
             showLoading(false);
             List<Flashcard> cards = task.getValue();
@@ -540,7 +536,7 @@ public class EliteLearnApp extends Application {
             showStatus("Deck '" + deckName + "' created successfully!", false);
             showDecksScreen();
         });
-
+        
         task.setOnFailed(e -> {
             showLoading(false);
             String errorMsg = task.getException().getMessage();
@@ -562,7 +558,7 @@ public class EliteLearnApp extends Application {
             showStatus("Please enter notes or upload a PDF first.", true);
             return;
         }
-
+        
         showLoading(true);
         Task<List<Flashcard>> task = new Task<>() {
             @Override
@@ -575,28 +571,28 @@ public class EliteLearnApp extends Application {
                 }
             }
         };
-
+        
         task.setOnSucceeded(e -> {
             showLoading(false);
             List<Flashcard> questions = task.getValue();
-
+            
             FileChooser testFC = new FileChooser();
             testFC.setInitialFileName(testName + "_Test.pdf");
             testFC.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF Files", "*.pdf"));
             File testFile = testFC.showSaveDialog(null);
-
+            
             if (testFile != null) {
                 try {
                     if (!testFile.getName().toLowerCase().endsWith(".pdf")) {
                         testFile = new File(testFile.getAbsolutePath() + ".pdf");
                     }
                     TestGenerator.generateTestPDF(testName, teacherName, questions, testFile);
-
+                    
                     FileChooser keyFC = new FileChooser();
                     keyFC.setInitialFileName(testName + "_AnswerKey.pdf");
                     keyFC.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF Files", "*.pdf"));
                     File keyFile = keyFC.showSaveDialog(null);
-
+                    
                     if (keyFile != null) {
                         if (!keyFile.getName().toLowerCase().endsWith(".pdf")) {
                             keyFile = new File(keyFile.getAbsolutePath() + ".pdf");
@@ -609,13 +605,223 @@ public class EliteLearnApp extends Application {
                 }
             }
         });
-
+        
         task.setOnFailed(e -> {
             showLoading(false);
             showStatus("Error: " + task.getException().getMessage(), true);
         });
         new Thread(task).start();
     }
+
+    // ==========================================
+    // FEYNMAN MODE LOGIC
+    // ==========================================
+
+    private void startFeynmanSession() {
+        String notes = notesArea != null && notesArea.isVisible() ? notesArea.getText() : (notesField != null ? notesField.getText() : "");
+        if (selectedPdfs.isEmpty() && notes.trim().isEmpty()) {
+            showStatus("Please enter notes or upload a PDF to teach me!", true);
+            return;
+        }
+        
+        // Combine notes and PDF context indicator for the AI
+        feynmanContext = notes;
+        if (!selectedPdfs.isEmpty()) {
+            feynmanContext += "\n[Note: The user has also uploaded " + selectedPdfs.size() + " PDF documents containing the core material.]";
+        }
+
+        showLoading(true);
+        Task<AIService.FeynmanInit> task = new Task<>() {
+            @Override
+            protected AIService.FeynmanInit call() throws Exception {
+                return aiService.initiateFeynmanSession(feynmanContext, ApiKeyManager.getApiKey());
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            showLoading(false);
+            AIService.FeynmanInit init = task.getValue();
+            feynmanConcept = init.concept;
+            feynmanPersona = init.persona;
+            feynmanCurrentQuestion = init.first_question;
+            feynmanTurn = 1;
+            showFeynmanUI();
+        });
+
+        task.setOnFailed(e -> {
+            showLoading(false);
+            showStatus("Error starting Feynman session: " + task.getException().getMessage(), true);
+        });
+        new Thread(task).start();
+    }
+
+    private void showFeynmanUI() {
+        VBox screen = new VBox(30);
+        screen.setPadding(new Insets(50));
+        screen.setAlignment(Pos.TOP_CENTER);
+        screen.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+
+        // Top Bar
+        HBox topBar = new HBox(30);
+        topBar.setAlignment(Pos.CENTER_LEFT);
+        topBar.setMaxWidth(1400);
+
+        Button backBtn = createGlassButton("< Back to Menu", false);
+        backBtn.setOnAction(e -> showMainMenu());
+
+        Label turnLabel = new Label("Turn " + feynmanTurn + " / " + MAX_FEYNMAN_TURNS);
+        turnLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 32));
+        turnLabel.setTextFill(Color.web("#f0b432"));
+        HBox.setHgrow(turnLabel, Priority.ALWAYS);
+        turnLabel.setAlignment(Pos.CENTER_RIGHT);
+
+        topBar.getChildren().addAll(backBtn, turnLabel);
+
+        // Concept & Persona Info
+        HBox infoBox = new HBox(40);
+        infoBox.setAlignment(Pos.CENTER);
+        infoBox.setMaxWidth(1400);
+
+        Label conceptLabel = new Label("🎯 Concept: " + feynmanConcept);
+        conceptLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 36));
+        conceptLabel.setTextFill(Color.WHITE);
+
+        Label personaLabel = new Label("🧠 Persona: " + feynmanPersona);
+        personaLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 36));
+        personaLabel.setTextFill(Color.web("#5c94ff"));
+
+        infoBox.getChildren().addAll(conceptLabel, personaLabel);
+
+        // AI Question Box
+        ScrollPane questionScroll = createTransparentScrollableLabel(feynmanCurrentQuestion, Color.WHITE, 36, 200);
+
+        // User Input Area
+        TextArea feynmanInputArea = new TextArea();
+        feynmanInputArea.setPromptText("Explain it to me like I'm " + feynmanPersona + "...");
+        feynmanInputArea.setWrapText(true);
+        feynmanInputArea.setPrefRowCount(6);
+        feynmanInputArea.setMaxWidth(1400);
+        feynmanInputArea.setStyle("-fx-background-color: #2b2b2b; -fx-control-inner-background: #2b2b2b; -fx-text-fill: #bbbbbb; -fx-border-color: #3574f0; -fx-border-radius: 8; -fx-background-radius: 8; -fx-font-size: 28px; -fx-padding: 15;");
+
+        // Buttons
+        HBox buttonBox = new HBox(20);
+        buttonBox.setAlignment(Pos.CENTER);
+
+        Button submitBtn = createGlassButton("Submit Explanation", false);
+        Button whiteFlagBtn = createGlassButton("White Flag 🏳️", true);
+
+        buttonBox.getChildren().addAll(submitBtn, whiteFlagBtn);
+
+        // Feedback Box (Initially Hidden)
+        ScrollPane feedbackScroll = createTransparentScrollableLabel("", Color.WHITE, 28, 300);
+        feedbackScroll.setVisible(false);
+
+        // Actions
+        submitBtn.setOnAction(e -> {
+            String userExplanation = feynmanInputArea.getText().trim();
+            if (userExplanation.isEmpty()) {
+                showStatus("You need to explain something first!", true);
+                return;
+            }
+            evaluateFeynmanExplanation(userExplanation, questionScroll, feedbackScroll, feynmanInputArea, submitBtn, whiteFlagBtn, turnLabel);
+        });
+
+        whiteFlagBtn.setOnAction(e -> {
+            resolveFeynmanQuestion(questionScroll, feedbackScroll, feynmanInputArea, submitBtn, whiteFlagBtn, turnLabel);
+        });
+
+        screen.getChildren().addAll(topBar, infoBox, questionScroll, feynmanInputArea, buttonBox, feedbackScroll);
+        contentPane.setCenter(screen);
+    }
+
+    private void evaluateFeynmanExplanation(String userExplanation, ScrollPane questionScroll, ScrollPane feedbackScroll, 
+                                            TextArea inputArea, Button submitBtn, Button whiteFlagBtn, Label turnLabel) {
+        showLoading(true);
+        Task<AIService.FeynmanEval> task = new Task<>() {
+            @Override
+            protected AIService.FeynmanEval call() throws Exception {
+                return aiService.evaluateFeynmanExplanation(
+                    feynmanPersona, feynmanConcept, feynmanCurrentQuestion, 
+                    userExplanation, feynmanTurn, ApiKeyManager.getApiKey()
+                );
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            showLoading(false);
+            AIService.FeynmanEval eval = task.getValue();
+            
+            // Show feedback
+            Label fbLabel = (Label) feedbackScroll.getContent();
+            fbLabel.setText("AI Feedback:\n" + eval.feedback + "\n\nNext Question:\n" + eval.next_question);
+            fbLabel.setTextFill(Color.web("#f0b432"));
+            feedbackScroll.setVisible(true);
+            
+            inputArea.clear();
+            
+            // Update state for next turn
+            feynmanTurn++;
+            feynmanCurrentQuestion = eval.next_question;
+            turnLabel.setText("Turn " + feynmanTurn + " / " + MAX_FEYNMAN_TURNS);
+            
+            // Update the question box for the next round
+            Label qLabel = (Label) questionScroll.getContent();
+            qLabel.setText(feynmanCurrentQuestion);
+            
+            if (feynmanTurn > MAX_FEYNMAN_TURNS) {
+                // Session Complete
+                submitBtn.setText("Session Complete!");
+                submitBtn.setDisable(true);
+                whiteFlagBtn.setDisable(true);
+                inputArea.setDisable(true);
+                showStatus("Feynman Session Complete! Great teaching!", false);
+            }
+        });
+
+        task.setOnFailed(e -> {
+            showLoading(false);
+            showStatus("Error evaluating explanation: " + task.getException().getMessage(), true);
+        });
+        new Thread(task).start();
+    }
+
+    private void resolveFeynmanQuestion(ScrollPane questionScroll, ScrollPane feedbackScroll, 
+                                        TextArea inputArea, Button submitBtn, Button whiteFlagBtn, Label turnLabel) {
+        showLoading(true);
+        Task<AIService.FeynmanResolve> task = new Task<>() {
+            @Override
+            protected AIService.FeynmanResolve call() throws Exception {
+                return aiService.resolveFeynmanQuestion(feynmanPersona, feynmanConcept, feynmanCurrentQuestion, ApiKeyManager.getApiKey());
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            showLoading(false);
+            AIService.FeynmanResolve resolve = task.getValue();
+            
+            Label fbLabel = (Label) feedbackScroll.getContent();
+            fbLabel.setText("🏳️ White Flag Raised! Here is the explanation:\n\n" + resolve.explanation);
+            fbLabel.setTextFill(Color.web("#5c94ff"));
+            feedbackScroll.setVisible(true);
+            
+            // End session immediately after white flag
+            submitBtn.setText("Session Ended");
+            submitBtn.setDisable(true);
+            whiteFlagBtn.setDisable(true);
+            inputArea.setDisable(true);
+            showStatus("Don't worry, learning takes time! Session ended.", false);
+        });
+
+        task.setOnFailed(e -> {
+            showLoading(false);
+            showStatus("Error resolving question: " + task.getException().getMessage(), true);
+        });
+        new Thread(task).start();
+    }
+
+    // ==========================================
+    // STANDARD DECK UI LOGIC
+    // ==========================================
 
     private void importDeck() {
         FileChooser fc = new FileChooser();
@@ -641,20 +847,20 @@ public class EliteLearnApp extends Application {
         screen.setPadding(new Insets(60));
         screen.setAlignment(Pos.TOP_CENTER);
         screen.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-
+        
         HBox topBar = new HBox(30);
         topBar.setAlignment(Pos.CENTER_LEFT);
         topBar.setMaxWidth(Double.MAX_VALUE);
-
+        
         Button backBtn = createGlassButton("< Back", false);
         backBtn.setOnAction(e -> showMainMenu());
-
+        
         Label title = new Label("Your Decks");
         title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 56));
         title.setTextFill(Color.WHITE);
         HBox.setHgrow(title, Priority.ALWAYS);
         topBar.getChildren().addAll(backBtn, title);
-
+        
         deckListView = new ListView<>();
         deckListView.setMaxWidth(1400);
         deckListView.setPrefWidth(1400);
@@ -662,7 +868,7 @@ public class EliteLearnApp extends Application {
         deckListView.setStyle("-fx-background-color: transparent; -fx-control-inner-background: transparent;");
         deckListView.setCellFactory(lv -> new DeckListCell(lv));
         refreshDeckList();
-
+        
         screen.getChildren().addAll(topBar, deckListView);
         contentPane.setCenter(screen);
     }
@@ -682,22 +888,22 @@ public class EliteLearnApp extends Application {
             content = new HBox(20);
             content.setAlignment(Pos.CENTER_LEFT);
             content.getStyleClass().add("deck-cell");
-            content.setPadding(new Insets(50, 40, 50, 40));
-
+            content.setPadding(new Insets(50, 40, 50, 40)); 
+            
             nameLabel = new Label();
             nameLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 38));
             nameLabel.setTextFill(Color.web("#bbbbbb"));
             HBox.setHgrow(nameLabel, Priority.ALWAYS);
-
+            
             studyBtn = createSmallGlassButton("Study", false);
             exportBtn = createSmallGlassButton("Export", false);
             deleteBtn = createSmallGlassButton("Delete", true);
-
+            
             HBox buttonBox = new HBox(15, studyBtn, exportBtn, deleteBtn);
             buttonBox.setAlignment(Pos.CENTER_RIGHT);
             HBox.setHgrow(nameLabel, Priority.ALWAYS);
             content.getChildren().addAll(nameLabel, buttonBox);
-
+            
             studyBtn.setOnAction(e -> { if (getItem() != null) startStudySession(getItem()); });
             exportBtn.setOnAction(e -> { if (getItem() != null) exportDeck(getItem()); });
             deleteBtn.setOnAction(e -> {
@@ -706,11 +912,11 @@ public class EliteLearnApp extends Application {
                     refreshDeckList();
                 }
             });
-
+            
             setOnMouseClicked(e -> {
                 if (isEmpty()) lv.getSelectionModel().clearSelection();
             });
-
+            
             content.setOnDragDetected(e -> {
                 if (getItem() == null) return;
                 Dragboard db = content.startDragAndDrop(TransferMode.MOVE);
@@ -719,12 +925,12 @@ public class EliteLearnApp extends Application {
                 db.setContent(cc);
                 e.consume();
             });
-
+            
             content.setOnDragOver(e -> {
                 if (e.getDragboard().hasString()) e.acceptTransferModes(TransferMode.MOVE);
                 e.consume();
             });
-
+            
             content.setOnDragDropped(e -> {
                 Dragboard db = e.getDragboard();
                 if (db.hasString()) {
@@ -769,24 +975,20 @@ public class EliteLearnApp extends Application {
             showDecksScreen();
             return;
         }
-
+        
         VBox screen = new VBox(30);
         screen.setPadding(new Insets(50));
         screen.setAlignment(Pos.CENTER);
         screen.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-
+        
         HBox topBar = new HBox();
         topBar.setAlignment(Pos.CENTER_LEFT);
         topBar.setMaxWidth(Double.MAX_VALUE);
-
+        
         Button backBtn = createGlassButton("< Back to Decks", false);
         backBtn.setOnAction(e -> showDecksScreen());
         topBar.getChildren().add(backBtn);
-
-        // ==========================================
-        // Question: Regular Label, sized for 3 lines
-        // 42px bold, ~55px per line × 3 = 165px min height
-        // ==========================================
+        
         Label questionLabel = new Label(currentStudyCard.getQuestion());
         questionLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 42));
         questionLabel.setTextFill(Color.WHITE);
@@ -795,11 +997,7 @@ public class EliteLearnApp extends Application {
         questionLabel.setMaxWidth(1400);
         questionLabel.setMinHeight(165);
         questionLabel.setAlignment(Pos.CENTER);
-
-        // ==========================================
-        // Answer: Regular Label, sized for 3 lines
-        // 32px normal, ~42px per line × 3 = 126px min height
-        // ==========================================
+        
         Label answerLabel = new Label(currentStudyCard.getAnswer());
         answerLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 32));
         answerLabel.setTextFill(Color.web("#5c94ff"));
@@ -809,37 +1007,33 @@ public class EliteLearnApp extends Application {
         answerLabel.setMinHeight(126);
         answerLabel.setAlignment(Pos.CENTER);
         answerLabel.setVisible(false);
-
+        
         TextField answerInputField = new TextField();
         answerInputField.setPromptText("Type your answer here...");
         answerInputField.setPrefWidth(800);
         answerInputField.setStyle("-fx-background-color: #2b2b2b; -fx-text-fill: white; -fx-border-color: #3574f0; -fx-border-radius: 8; -fx-font-size: 32px; -fx-padding: 15;");
-
+        
         Button submitAnswerBtn = createSmallGlassButton("Submit to AI", false);
         Button cancelAnswerBtn = createSmallGlassButton("Cancel", true);
-
+        
         HBox inputBox = new HBox(15, answerInputField, submitAnswerBtn, cancelAnswerBtn);
         inputBox.setAlignment(Pos.CENTER);
         inputBox.setVisible(false);
-
-        // ==========================================
-        // AI Feedback: Scrollable, transparent background
-        // ==========================================
+        
         ScrollPane feedbackScroll = createTransparentScrollableLabel("", Color.WHITE, 32, 350);
         feedbackScroll.setVisible(false);
-        // Move AI feedback upward so it occupies the same visual position as the regular answer.
         VBox.setMargin(feedbackScroll, new Insets(-40, 0, 0, 0));
-
+        
         HBox buttonBox = new HBox(20);
         buttonBox.setAlignment(Pos.CENTER);
-
+        
         Button revealBtn = createGlassButton("Reveal Answer", false);
         Button typeAnswerBtn = createGlassButton("Type My Answer", false);
         Button correctBtn = createGlassButton("Correct", false);
         correctBtn.getStyleClass().add("green");
         Button incorrectBtn = createGlassButton("Incorrect", true);
         Button skipBtn = createGlassButton("Skip / Next", false);
-
+        
         revealBtn.setOnAction(e -> {
             answerLabel.setVisible(true);
             revealBtn.setVisible(false);
@@ -847,7 +1041,7 @@ public class EliteLearnApp extends Application {
             correctBtn.setVisible(true);
             incorrectBtn.setVisible(true);
         });
-
+        
         typeAnswerBtn.setOnAction(e -> {
             inputBox.setVisible(true);
             answerInputField.requestFocus();
@@ -855,7 +1049,7 @@ public class EliteLearnApp extends Application {
             revealBtn.setVisible(false);
             skipBtn.setVisible(false);
         });
-
+        
         cancelAnswerBtn.setOnAction(e -> {
             inputBox.setVisible(false);
             answerInputField.clear();
@@ -863,19 +1057,19 @@ public class EliteLearnApp extends Application {
             revealBtn.setVisible(true);
             skipBtn.setVisible(true);
         });
-
+        
         correctBtn.setVisible(false);
         correctBtn.setOnAction(e -> {
             currentStudyDeck.updateWeight(currentStudyCard, true);
             loadNextCard();
         });
-
+        
         incorrectBtn.setVisible(false);
         incorrectBtn.setOnAction(e -> {
             currentStudyDeck.updateWeight(currentStudyCard, false);
             loadNextCard();
         });
-
+        
         submitAnswerBtn.setOnAction(e -> {
             String userAns = answerInputField.getText();
             if (userAns.trim().isEmpty()) return;
@@ -894,19 +1088,19 @@ public class EliteLearnApp extends Application {
             gradeTask.setOnSucceeded(ev -> {
                 showLoading(false);
                 AIService.GradeResult res = gradeTask.getValue();
-
+                
                 Label fbLabel = (Label) feedbackScroll.getContent();
                 fbLabel.setText("Score: " + res.score + "/10 | Grade: " + res.grade + "\n\nCorrect Answer:\n" + currentStudyCard.getAnswer() + "\n\nAI Feedback:\n" + res.explanation);
-
+                
                 if (res.score >= 9) fbLabel.setTextFill(Color.web("#2ea043"));
                 else if (res.score <= 7) fbLabel.setTextFill(Color.web("#ff5555"));
                 else fbLabel.setTextFill(Color.web("#f0b432"));
-
+                
                 feedbackScroll.setVisible(true);
                 feedbackScroll.setTranslateY(-70);
                 inputBox.setVisible(false);
                 skipBtn.setVisible(true);
-
+                
                 if (res.score >= 9) currentStudyDeck.updateWeight(currentStudyCard, true);
                 else if (res.score <= 7) currentStudyDeck.updateWeight(currentStudyCard, false);
             });
@@ -916,7 +1110,7 @@ public class EliteLearnApp extends Application {
             });
             new Thread(gradeTask).start();
         });
-
+        
         skipBtn.setOnAction(e -> loadNextCard());
         buttonBox.getChildren().addAll(revealBtn, typeAnswerBtn, correctBtn, incorrectBtn, skipBtn);
         screen.getChildren().addAll(topBar, questionLabel, answerLabel, inputBox, feedbackScroll, buttonBox);
