@@ -50,12 +50,17 @@ public class EliteLearnApp extends Application {
     // ==========================================
     // FEYNMAN MODE STATE
     // ==========================================
+    private String feynmanTitle;
     private String feynmanConcept;
-    private String feynmanPersona;
     private String feynmanCurrentQuestion;
-    private String feynmanContext;
+    private StringBuilder feynmanHistory;
     private int feynmanTurn = 1;
     private static final int MAX_FEYNMAN_TURNS = 3;
+    
+    private ScrollPane historyScroll;
+    private TextArea feynmanInputArea;
+    private Button submitBtn;
+    private Button whiteFlagBtn;
 
     @Override
     public void start(Stage primaryStage) {
@@ -233,21 +238,19 @@ public class EliteLearnApp extends Application {
         delay.play();
     }
 
-    private ScrollPane createTransparentScrollableLabel(String text, Color textColor, double fontSize, double maxHeight) {
+    private ScrollPane createTransparentScrollableLabel(String text, Color textColor, double fontSize) {
         Label label = new Label(text);
         label.setWrapText(true);
         label.setTextFill(textColor);
         label.setFont(Font.font("Segoe UI", FontWeight.NORMAL, fontSize));
-        label.setTextAlignment(TextAlignment.CENTER);
+        label.setTextAlignment(TextAlignment.LEFT);
         label.setMaxWidth(Double.MAX_VALUE);
-        label.setPadding(new Insets(15));
+        label.setPadding(new Insets(20));
         
         ScrollPane scrollPane = new ScrollPane(label);
         scrollPane.setFitToWidth(true);
         scrollPane.setFitToHeight(false);
         scrollPane.setPannable(true);
-        scrollPane.setMaxHeight(maxHeight);
-        scrollPane.setPrefHeight(Region.USE_COMPUTED_SIZE);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         
@@ -322,7 +325,7 @@ public class EliteLearnApp extends Application {
         nameLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 32));
         
         deckNameField = new TextField();
-        deckNameField.setPromptText("Enter Session Name (Optional for Feynman)...");
+        deckNameField.setPromptText("Enter Session Name...");
         deckNameField.setPrefWidth(600);
         deckNameField.setStyle("-fx-background-color: #2b2b2b; -fx-text-fill: #bbbbbb; -fx-border-color: #3c3f41; -fx-border-radius: 8; -fx-background-radius: 8; -fx-font-size: 28px; -fx-padding: 10;");
         
@@ -337,7 +340,7 @@ public class EliteLearnApp extends Application {
         modeLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 32));
         
         ComboBox<String> modeDropdown = new ComboBox<>();
-        modeDropdown.getItems().addAll("Flashcard Deck", "Test (PDF)", "Feynman Mode 🧠");
+        modeDropdown.getItems().addAll("Flashcard Deck", "Test (PDF)", "Feynman Mode");
         modeDropdown.setValue("Flashcard Deck");
         modeDropdown.setStyle("-fx-font-size: 28px; -fx-background-color: #2b2b2b; -fx-padding: 5;");
         
@@ -618,23 +621,24 @@ public class EliteLearnApp extends Application {
     // ==========================================
 
     private void startFeynmanSession() {
+        feynmanTitle = deckNameField.getText().trim();
+        if (feynmanTitle.isEmpty()) {
+            showStatus("Please enter a title for your session.", true);
+            return;
+        }
+
         String notes = notesArea != null && notesArea.isVisible() ? notesArea.getText() : (notesField != null ? notesField.getText() : "");
         if (selectedPdfs.isEmpty() && notes.trim().isEmpty()) {
             showStatus("Please enter notes or upload a PDF to teach me!", true);
             return;
-        }
-        
-        // Combine notes and PDF context indicator for the AI
-        feynmanContext = notes;
-        if (!selectedPdfs.isEmpty()) {
-            feynmanContext += "\n[Note: The user has also uploaded " + selectedPdfs.size() + " PDF documents containing the core material.]";
         }
 
         showLoading(true);
         Task<AIService.FeynmanInit> task = new Task<>() {
             @Override
             protected AIService.FeynmanInit call() throws Exception {
-                return aiService.initiateFeynmanSession(feynmanContext, ApiKeyManager.getApiKey());
+                // UPDATED: Now passing the actual PDF files to the AI
+                return aiService.initiateFeynmanSession(notes, selectedPdfs, ApiKeyManager.getApiKey());
             }
         };
 
@@ -642,8 +646,8 @@ public class EliteLearnApp extends Application {
             showLoading(false);
             AIService.FeynmanInit init = task.getValue();
             feynmanConcept = init.concept;
-            feynmanPersona = init.persona;
             feynmanCurrentQuestion = init.first_question;
+            feynmanHistory = new StringBuilder("1. ").append(feynmanCurrentQuestion);
             feynmanTurn = 1;
             showFeynmanUI();
         });
@@ -656,92 +660,71 @@ public class EliteLearnApp extends Application {
     }
 
     private void showFeynmanUI() {
-        VBox screen = new VBox(30);
-        screen.setPadding(new Insets(50));
-        screen.setAlignment(Pos.TOP_CENTER);
-        screen.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        VBox mainLayout = new VBox(20);
+        mainLayout.setPadding(new Insets(30));
+        mainLayout.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
-        // Top Bar
         HBox topBar = new HBox(30);
         topBar.setAlignment(Pos.CENTER_LEFT);
-        topBar.setMaxWidth(1400);
+        topBar.setMaxWidth(Double.MAX_VALUE);
 
         Button backBtn = createGlassButton("< Back to Menu", false);
         backBtn.setOnAction(e -> showMainMenu());
 
-        Label turnLabel = new Label("Turn " + feynmanTurn + " / " + MAX_FEYNMAN_TURNS);
-        turnLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 32));
-        turnLabel.setTextFill(Color.web("#f0b432"));
-        HBox.setHgrow(turnLabel, Priority.ALWAYS);
-        turnLabel.setAlignment(Pos.CENTER_RIGHT);
+        Label titleLabel = new Label(feynmanTitle);
+        titleLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 42));
+        titleLabel.setTextFill(Color.web("#f0b432"));
+        HBox.setHgrow(titleLabel, Priority.ALWAYS);
+        titleLabel.setAlignment(Pos.CENTER);
 
-        topBar.getChildren().addAll(backBtn, turnLabel);
+        topBar.getChildren().addAll(backBtn, titleLabel);
 
-        // Concept & Persona Info
-        HBox infoBox = new HBox(40);
-        infoBox.setAlignment(Pos.CENTER);
-        infoBox.setMaxWidth(1400);
+        historyScroll = createTransparentScrollableLabel(feynmanHistory.toString(), Color.WHITE, 32);
+        VBox.setVgrow(historyScroll, Priority.ALWAYS);
 
-        Label conceptLabel = new Label("🎯 Concept: " + feynmanConcept);
-        conceptLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 36));
-        conceptLabel.setTextFill(Color.WHITE);
-
-        Label personaLabel = new Label("🧠 Persona: " + feynmanPersona);
-        personaLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 36));
-        personaLabel.setTextFill(Color.web("#5c94ff"));
-
-        infoBox.getChildren().addAll(conceptLabel, personaLabel);
-
-        // AI Question Box
-        ScrollPane questionScroll = createTransparentScrollableLabel(feynmanCurrentQuestion, Color.WHITE, 36, 200);
-
-        // User Input Area
-        TextArea feynmanInputArea = new TextArea();
-        feynmanInputArea.setPromptText("Explain it to me like I'm " + feynmanPersona + "...");
+        feynmanInputArea = new TextArea();
+        feynmanInputArea.setPromptText("Explain the concept...");
         feynmanInputArea.setWrapText(true);
-        feynmanInputArea.setPrefRowCount(6);
-        feynmanInputArea.setMaxWidth(1400);
+        feynmanInputArea.setPrefHeight(300);
         feynmanInputArea.setStyle("-fx-background-color: #2b2b2b; -fx-control-inner-background: #2b2b2b; -fx-text-fill: #bbbbbb; -fx-border-color: #3574f0; -fx-border-radius: 8; -fx-background-radius: 8; -fx-font-size: 28px; -fx-padding: 15;");
 
-        // Buttons
         HBox buttonBox = new HBox(20);
         buttonBox.setAlignment(Pos.CENTER);
 
-        Button submitBtn = createGlassButton("Submit Explanation", false);
-        Button whiteFlagBtn = createGlassButton("White Flag 🏳️", true);
+        submitBtn = createGlassButton("Submit Explanation", false);
+        whiteFlagBtn = createGlassButton("White Flag", true);
 
         buttonBox.getChildren().addAll(submitBtn, whiteFlagBtn);
 
-        // Feedback Box (Initially Hidden)
-        ScrollPane feedbackScroll = createTransparentScrollableLabel("", Color.WHITE, 28, 300);
-        feedbackScroll.setVisible(false);
-
-        // Actions
         submitBtn.setOnAction(e -> {
             String userExplanation = feynmanInputArea.getText().trim();
             if (userExplanation.isEmpty()) {
                 showStatus("You need to explain something first!", true);
                 return;
             }
-            evaluateFeynmanExplanation(userExplanation, questionScroll, feedbackScroll, feynmanInputArea, submitBtn, whiteFlagBtn, turnLabel);
+            evaluateFeynmanExplanation(userExplanation);
         });
 
         whiteFlagBtn.setOnAction(e -> {
-            resolveFeynmanQuestion(questionScroll, feedbackScroll, feynmanInputArea, submitBtn, whiteFlagBtn, turnLabel);
+            resolveFeynmanQuestion();
         });
 
-        screen.getChildren().addAll(topBar, infoBox, questionScroll, feynmanInputArea, buttonBox, feedbackScroll);
-        contentPane.setCenter(screen);
+        mainLayout.getChildren().addAll(topBar, historyScroll, feynmanInputArea, buttonBox);
+        contentPane.setCenter(mainLayout);
     }
 
-    private void evaluateFeynmanExplanation(String userExplanation, ScrollPane questionScroll, ScrollPane feedbackScroll, 
-                                            TextArea inputArea, Button submitBtn, Button whiteFlagBtn, Label turnLabel) {
+    private void evaluateFeynmanExplanation(String userExplanation) {
+        // 1. Disable UI to prevent double submission and indicate loading
+        feynmanInputArea.setDisable(true);
+        submitBtn.setDisable(true);
+        whiteFlagBtn.setDisable(true);
         showLoading(true);
+
         Task<AIService.FeynmanEval> task = new Task<>() {
             @Override
             protected AIService.FeynmanEval call() throws Exception {
                 return aiService.evaluateFeynmanExplanation(
-                    feynmanPersona, feynmanConcept, feynmanCurrentQuestion, 
+                    feynmanConcept, feynmanCurrentQuestion, 
                     userExplanation, feynmanTurn, ApiKeyManager.getApiKey()
                 );
             }
@@ -751,47 +734,59 @@ public class EliteLearnApp extends Application {
             showLoading(false);
             AIService.FeynmanEval eval = task.getValue();
             
-            // Show feedback
-            Label fbLabel = (Label) feedbackScroll.getContent();
-            fbLabel.setText("AI Feedback:\n" + eval.feedback + "\n\nNext Question:\n" + eval.next_question);
-            fbLabel.setTextFill(Color.web("#f0b432"));
-            feedbackScroll.setVisible(true);
+            // 2. ONLY NOW do we move the text to history and clear the input
+            feynmanHistory.append("\n\n").append(userExplanation);
             
-            inputArea.clear();
-            
-            // Update state for next turn
             feynmanTurn++;
-            feynmanCurrentQuestion = eval.next_question;
-            turnLabel.setText("Turn " + feynmanTurn + " / " + MAX_FEYNMAN_TURNS);
+            if (feynmanTurn <= MAX_FEYNMAN_TURNS) {
+                feynmanCurrentQuestion = eval.next_question;
+                feynmanHistory.append("\n\n").append(feynmanTurn).append(". ").append(feynmanCurrentQuestion);
+            } else {
+                feynmanHistory.append("\n\nSession Complete!");
+                showStatus("Feynman Session Complete! Great teaching!", false);
+            }
             
-            // Update the question box for the next round
-            Label qLabel = (Label) questionScroll.getContent();
-            qLabel.setText(feynmanCurrentQuestion);
+            updateHistoryUI();
+            feynmanInputArea.clear(); // Clear ONLY on success
             
-            if (feynmanTurn > MAX_FEYNMAN_TURNS) {
-                // Session Complete
-                submitBtn.setText("Session Complete!");
+            // Re-enable if not complete
+            if (feynmanTurn <= MAX_FEYNMAN_TURNS) {
+                feynmanInputArea.setDisable(false);
+                submitBtn.setDisable(false);
+                whiteFlagBtn.setDisable(false);
+                feynmanInputArea.requestFocus();
+            } else {
+                feynmanInputArea.setDisable(true);
                 submitBtn.setDisable(true);
                 whiteFlagBtn.setDisable(true);
-                inputArea.setDisable(true);
-                showStatus("Feynman Session Complete! Great teaching!", false);
             }
         });
 
         task.setOnFailed(e -> {
             showLoading(false);
+            // 3. Re-enable UI and KEEP the text so the user can retry
+            feynmanInputArea.setDisable(false);
+            submitBtn.setDisable(false);
+            whiteFlagBtn.setDisable(false);
+            feynmanInputArea.requestFocus();
             showStatus("Error evaluating explanation: " + task.getException().getMessage(), true);
         });
         new Thread(task).start();
     }
 
-    private void resolveFeynmanQuestion(ScrollPane questionScroll, ScrollPane feedbackScroll, 
-                                        TextArea inputArea, Button submitBtn, Button whiteFlagBtn, Label turnLabel) {
+    private void resolveFeynmanQuestion() {
+        feynmanHistory.append("\n\n🏳️ White Flag Raised!");
+        updateHistoryUI();
+        
+        feynmanInputArea.setDisable(true);
+        submitBtn.setDisable(true);
+        whiteFlagBtn.setDisable(true);
         showLoading(true);
+
         Task<AIService.FeynmanResolve> task = new Task<>() {
             @Override
             protected AIService.FeynmanResolve call() throws Exception {
-                return aiService.resolveFeynmanQuestion(feynmanPersona, feynmanConcept, feynmanCurrentQuestion, ApiKeyManager.getApiKey());
+                return aiService.resolveFeynmanQuestion(feynmanConcept, feynmanCurrentQuestion, ApiKeyManager.getApiKey());
             }
         };
 
@@ -799,24 +794,27 @@ public class EliteLearnApp extends Application {
             showLoading(false);
             AIService.FeynmanResolve resolve = task.getValue();
             
-            Label fbLabel = (Label) feedbackScroll.getContent();
-            fbLabel.setText("🏳️ White Flag Raised! Here is the explanation:\n\n" + resolve.explanation);
-            fbLabel.setTextFill(Color.web("#5c94ff"));
-            feedbackScroll.setVisible(true);
+            feynmanHistory.append("\n\n").append(resolve.explanation);
+            updateHistoryUI();
             
-            // End session immediately after white flag
-            submitBtn.setText("Session Ended");
-            submitBtn.setDisable(true);
-            whiteFlagBtn.setDisable(true);
-            inputArea.setDisable(true);
             showStatus("Don't worry, learning takes time! Session ended.", false);
         });
 
         task.setOnFailed(e -> {
             showLoading(false);
+            // Re-enable on failure so they can try the white flag again or just go back
+            feynmanInputArea.setDisable(false);
+            submitBtn.setDisable(false);
+            whiteFlagBtn.setDisable(false);
             showStatus("Error resolving question: " + task.getException().getMessage(), true);
         });
         new Thread(task).start();
+    }
+
+    private void updateHistoryUI() {
+        Label historyLabel = (Label) historyScroll.getContent();
+        historyLabel.setText(feynmanHistory.toString());
+        historyScroll.setVvalue(1.0);
     }
 
     // ==========================================
@@ -1020,8 +1018,9 @@ public class EliteLearnApp extends Application {
         inputBox.setAlignment(Pos.CENTER);
         inputBox.setVisible(false);
         
-        ScrollPane feedbackScroll = createTransparentScrollableLabel("", Color.WHITE, 32, 350);
+        ScrollPane feedbackScroll = createTransparentScrollableLabel("", Color.WHITE, 32);
         feedbackScroll.setVisible(false);
+        feedbackScroll.setMaxHeight(350);
         VBox.setMargin(feedbackScroll, new Insets(-40, 0, 0, 0));
         
         HBox buttonBox = new HBox(20);

@@ -19,14 +19,13 @@ import java.util.List;
 
 public class AIService {
     private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
-    private static final String MODEL = "gemini-3.6-flash"; // Updated to a stable flash model
+    private static final String MODEL = "gemini-3.6-flash"; 
     private final HttpClient httpClient;
     private final Gson gson;
 
     // --- Feynman Mode Data Classes ---
     public static class FeynmanInit {
         public String concept;
-        public String persona;
         public String first_question;
     }
 
@@ -56,62 +55,69 @@ public class AIService {
     // FEYNMAN MODE METHODS
     // ==========================================
     
-    public FeynmanInit initiateFeynmanSession(String rawContext, String apiKey) throws Exception {
+    // UPDATED: Now accepts pdfFiles to actually send the PDF content to the AI
+    public FeynmanInit initiateFeynmanSession(String rawNotes, List<File> pdfFiles, String apiKey) throws Exception {
         String prompt = """
                 You are an expert educational assistant testing a student using the Feynman Technique.
-                I will provide some study material. Your goal is to test if the student truly understands it by making them teach it to you.
+                I will provide study material (text and/or PDFs). Your goal is to test if the student truly understands it by making them teach it to you.
                 
-                1. Pick ONE core, fundamental concept from the material.
-                2. Adopt a specific, fun persona of a learner who needs this explained (e.g., 'A curious 5-year-old', 'A skeptical college peer', 'A time-traveling historical figure', 'A confused alien').
-                3. Ask the student to explain this concept to you in simple terms, staying in character.
+                CRITICAL RULES:
+                1. You MUST pick ONE core, fundamental concept STRICTLY FROM the provided material. 
+                2. DO NOT ask about the Feynman technique itself.
+                3. DO NOT ask about generic topics (like photosynthesis, math, history) unless they are EXPLICITLY in the provided material.
+                4. If the provided material is empty or lacks a clear concept, state that you cannot generate a question without valid material.
                 
-                You MUST output ONLY a valid JSON object with exactly these three keys:
-                - "concept": string (the name of the concept)
-                - "persona": string (a short description of your persona, e.g., "Curious 5-Year-Old")
-                - "first_question": string (your first question as the persona)
-                
-                Source material:
-                %s
-                """.formatted(rawContext);
-
-        JsonObject payload = buildPayload(prompt, null, null);
+                You MUST output ONLY a valid JSON object with exactly these two keys:
+                - "concept": string (the name of the concept from the text)
+                - "first_question": string (your first question asking them to explain it)
+                """;
+        
+        List<String> base64Datas = new ArrayList<>();
+        if (pdfFiles != null && !pdfFiles.isEmpty()) {
+            for (File pdf : pdfFiles) {
+                byte[] fileBytes = Files.readAllBytes(pdf.toPath());
+                base64Datas.add(Base64.getEncoder().encodeToString(fileBytes));
+            }
+        }
+        
+        String mimeType = base64Datas.isEmpty() ? null : "application/pdf";
+        JsonObject payload = buildPayload(prompt, mimeType, base64Datas.isEmpty() ? null : base64Datas);
         String jsonText = sendRequestAndGetText(payload, apiKey);
         return gson.fromJson(jsonText, FeynmanInit.class);
     }
 
-    public FeynmanEval evaluateFeynmanExplanation(String persona, String concept, String previousQuestion, 
+    public FeynmanEval evaluateFeynmanExplanation(String concept, String previousQuestion, 
                                                   String userExplanation, int currentTurn, String apiKey) throws Exception {
         String prompt = """
                 You are continuing a Feynman Technique session. 
-                Your Persona: %s
                 Concept being taught: %s
                 Your previous question: %s
                 Student's explanation: %s
                 
                 This is turn %d out of 3.
                 
-                Evaluate the student's explanation. Point out any weak points, jargon they used without explaining, or things they missed. 
-                Then, ask ONE probing, Socratic follow-up question to test their deeper understanding. Stay in character!
+                Evaluate the student's explanation. Point out any weak points, jargon they used without explaining, or things they missed based STRICTLY on the source material. 
+                Then, ask ONE probing, Socratic follow-up question to test their deeper understanding of the concept.
                 
                 IMPORTANT: If this is turn 3 out of 3, DO NOT ask another question. Instead, give a final, encouraging summary of their teaching and tell them the session is complete.
                 
                 You MUST output ONLY a valid JSON object with exactly these two keys:
                 - "feedback": string (your evaluation and critique)
                 - "next_question": string (your follow-up question, OR your final summary if this is turn 3)
-                """.formatted(persona, concept, previousQuestion, userExplanation, currentTurn);
+                """.formatted(concept, previousQuestion, userExplanation, currentTurn);
 
         JsonObject payload = buildPayload(prompt, null, null);
         String jsonText = sendRequestAndGetText(payload, apiKey);
         return gson.fromJson(jsonText, FeynmanEval.class);
     }
 
-    public FeynmanResolve resolveFeynmanQuestion(String persona, String concept, String currentQuestion, String apiKey) throws Exception {
+    public FeynmanResolve resolveFeynmanQuestion(String concept, String currentQuestion, String apiKey) throws Exception {
         String prompt = """
                 The student has raised a white flag and given up on explaining the concept.
                 Concept: %s
                 Current Question: %s
                 
-                Drop the persona slightly and explain the concept to the student in a very simple, clear, and easy-to-understand way so they can actually learn it. 
+                Explain the concept to the student in a very simple, clear, and easy-to-understand way so they can actually learn it, based on the source material. 
                 
                 You MUST output ONLY a valid JSON object with exactly this key:
                 - "explanation": string (your simple, clear explanation)
