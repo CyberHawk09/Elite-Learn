@@ -452,12 +452,12 @@ public class EliteLearnApp extends Application {
         Button cancelBtn = createGlassButton("Cancel", false);
         cancelBtn.setOnAction(e -> showMainMenu());
         
-        Button generateBtn = createGlassButton("Start Session", false);
+        Button generateBtn = createGlassButton("Create", false);
         generateBtn.setOnAction(e -> {
             String mode = modeDropdown.getValue();
             if ("Test (PDF)".equals(mode)) {
                 generateTest(teacherField.getText());
-            } else if ("Feynman Mode 🧠".equals(mode)) {
+            } else if ("Feynman Mode".equals(mode)) {
                 startFeynmanSession();
             } else {
                 generateDeck();
